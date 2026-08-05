@@ -60,6 +60,9 @@ Dans cet ordre. Rien de tout ça ne peut être fait depuis une session Claude.
 7. **Jeton hub** — générer `HUB_TOKEN`, le poser côté CarAI **et** en `HUB_TOKEN_CARAI`
    côté Hubperso. ⚠️ Hubperso doit être **redéployé** : l'ajout de l'app est du code.
 8. **`CRON_SECRET`** — pour le poll planifié (seulement si le module Toyota est activé).
+   ⚠️ Le poll ne passe **pas** par un cron Vercel : le plan Hobby n'autorise que des crons
+   quotidiens et refuse le déploiement au-delà. Le déclencheur est
+   `.github/workflows/toyota-poll.yml`, en manuel tant que Toyota est désactivé.
 
 ### Avant d'activer Toyota (facultatif, et à faire en connaissance de cause)
 

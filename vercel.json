@@ -1,8 +1,0 @@
-{
-  "crons": [
-    {
-      "path": "/api/cron/toyota-poll",
-      "schedule": "0 */2 * * *"
-    }
-  ]
-}
