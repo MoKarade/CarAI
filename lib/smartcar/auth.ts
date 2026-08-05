@@ -8,6 +8,7 @@
 // Le token applicatif vit 1 heure et n'a PAS de refresh token : on en redemande un.
 
 import { parseSmartcarError, type SmartcarError } from "./errors";
+import type { Env } from "@/lib/env";
 
 export const URL_TOKEN = "https://iam.smartcar.com/oauth2/token";
 
@@ -45,7 +46,7 @@ export interface CredentialsSmartcar {
  * assumé, pas une panne. L'appelant affiche « non connecté » plutôt que d'inventer un état.
  */
 export function credentialsSmartcar(
-  env: NodeJS.ProcessEnv = process.env,
+  env: Env = process.env,
 ): CredentialsSmartcar | null {
   const clientId = env.SMARTCAR_CLIENT_ID?.trim();
   const clientSecret = env.SMARTCAR_CLIENT_SECRET?.trim();

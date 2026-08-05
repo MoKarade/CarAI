@@ -74,8 +74,19 @@ export const SANTE_TOYOTA_DEFAUT: SanteToyota = {
   dernierReveilForce: null,
 };
 
-/** Lit une valeur de config. `null` si absente — jamais une valeur inventée. */
-export async function lireConfig<T>(cle: string, schema: z.ZodType<T>): Promise<T | null> {
+/**
+ * Lit une valeur de config. `null` si absente — jamais une valeur inventée.
+ *
+ * Générique sur le SCHÉMA (`S extends z.ZodTypeAny`) et non sur le type de sortie : avec
+ * `z.ZodType<T>`, TypeScript exige que l'entrée et la sortie du schéma coïncident, ce que
+ * `.default()` rend faux par construction (un champ à défaut est optionnel en entrée,
+ * garanti en sortie). C'est précisément la tolérance qu'on veut ici — une config écrite
+ * avant l'ajout d'un champ doit rester lisible.
+ */
+export async function lireConfig<S extends z.ZodTypeAny>(
+  cle: string,
+  schema: S,
+): Promise<z.infer<S> | null> {
   const lignes = await db
     .select({ value: appConfig.value })
     .from(appConfig)

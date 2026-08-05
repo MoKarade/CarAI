@@ -11,6 +11,7 @@
 import { neon } from "@neondatabase/serverless";
 import { drizzle, type NeonHttpDatabase } from "drizzle-orm/neon-http";
 import * as schema from "./schema";
+import type { Env } from "@/lib/env";
 
 let instance: NeonHttpDatabase<typeof schema> | null = null;
 
@@ -27,7 +28,7 @@ function connect(): NeonHttpDatabase<typeof schema> {
 }
 
 /** true si la base est configurée. Pour DÉCIDER d'afficher un état honnête, pas pour cacher une panne. */
-export function baseConfiguree(env: NodeJS.ProcessEnv = process.env): boolean {
+export function baseConfiguree(env: Env = process.env): boolean {
   return Boolean(env.DATABASE_URL?.trim());
 }
 

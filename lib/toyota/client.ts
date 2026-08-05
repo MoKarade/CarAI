@@ -34,6 +34,7 @@
 //     et rester sur Smartcar — ce n'est pas un échec du projet (Doc 3 §7).
 
 import type { SignalBrut } from "@/lib/smartcar/signals";
+import type { Env } from "@/lib/env";
 
 /**
  * Ce que CarAI attend d'une source Toyota. Interface DÉLIBÉRÉMENT étroite : plus elle est
@@ -72,7 +73,7 @@ export interface CredentialsToyota {
 
 /** Identifiants Toyota depuis l'environnement. JAMAIS en base, JAMAIS en dur (Doc 3 §4.1). */
 export function credentialsToyota(
-  env: NodeJS.ProcessEnv = process.env,
+  env: Env = process.env,
 ): CredentialsToyota | null {
   const username = env.TOYOTA_USERNAME?.trim();
   const password = env.TOYOTA_PASSWORD?.trim();
@@ -88,6 +89,10 @@ export function credentialsToyota(
  * cette source — c'est précisément ce que l'isolation du Doc 1 §1 exige.
  */
 export function creerClientToyota(
+  // Le paramètre fait partie du contrat que l'implémentation à venir consommera. Le
+  // retirer obligerait à toucher tous les appelants le jour du branchement, pour une
+  // ligne de confort aujourd'hui.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _credentials: CredentialsToyota,
 ): ClientToyota | null {
   return null;

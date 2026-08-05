@@ -86,3 +86,37 @@ code {
   padding: 0.1em 0.35em;
   border-radius: 5px;
 }
+
+/* Liste des mesures du tableau de bord. Chaque ligne porte sa valeur, sa source et son
+   âge : une donnée sans provenance ni fraîcheur serait trompeuse ici, la fraîcheur réelle
+   du véhicule étant de 30 à 60 minutes. */
+.mesures {
+  list-style: none;
+  margin: 0.5rem 0 1.2rem;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+.mesures li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: "libelle valeur" "meta meta";
+  gap: 0.15rem 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  background: oklch(60% 0.02 265 / 0.08);
+}
+.mesures .libelle {
+  grid-area: libelle;
+  font-weight: 600;
+}
+.mesures .valeur {
+  grid-area: valeur;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.mesures .meta {
+  grid-area: meta;
+  color: var(--text-soft);
+  font-size: 0.8rem;
+}

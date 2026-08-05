@@ -1,76 +1,80 @@
-# CLAUDE.md — app-template
+# CLAUDE.md — CarAI
 
-Squelette d'app de l'écosystème hub perso. Deux responsabilités génériques, déjà branchées :
-exposer `GET /hub/summary` conforme à
-[`@mokarade/hub-contract`](https://github.com/MoKarade/hub-contract), et rester **privée**
-(login Google, une seule adresse). Tout le reste — l'interface, le moteur métier — se
-construit après le fork.
+Suivi complet du véhicule électrique de Marc (Toyota bZ XLE AWD 2026, bail signé le
+14 juillet 2026). Collecte les données du véhicule dans le temps, les rend en graphiques,
+les publie au hub perso et les expose à Claude via un serveur MCP.
 
-> **Ce fichier condense ce que les cinq apps de l'écosystème ont appris en production**
-> (Hubperso, FinanceAI, DriveAI, BatchChef, JobAI). Chaque avertissement marqué ⚠️ vient
-> d'un vrai bug, pas d'une précaution théorique. Ce que ce fichier oublie, chaque fork
-> l'oubliera.
+> Ce fichier se charge à **chaque session** — il reste court. Le détail vit dans
+> `HANDOVER.md` (état courant, à lire en premier) et `BACKLOG.md`.
+
+## Deux sources, une hiérarchie non négociable
+
+- **Smartcar** (`lib/smartcar/`) — API officielle, socle stable. Tout ce qui compte en dépend.
+- **Toyota NA** (`lib/toyota/`) — source complémentaire **non officielle**, fragile par
+  nature (Toyota a déjà cassé ce type d'accès deux fois : DMCA en 2022, puis 2FA obligatoire).
+
+⚠️ **Si Toyota tombe, CarAI continue normalement sur Smartcar seul.** Aucune fonctionnalité
+cœur ne dépend du module non officiel. Il est **désactivé par défaut** (`TOYOTA_NA_ENABLED`),
+s'auto-désactive après 5 échecs consécutifs, et se réactive tout seul 24 h plus tard —
+une quarantaine sans chemin de retour transforme une panne passagère en perte définitive.
 
 ## Principes non négociables
 
-- **Contrat d'abord.** Toute réponse de `/hub/summary` passe par le schéma du contrat
-  (`buildingSummary` le garantit ; au fork, `validateSummary(...)` sur un vrai summary).
-  Le hub REJETTE ce qui dévie — il affichera « invalide », pas tes données.
-- **No fake data.** Par défaut `status: "building"`, aucune métrique inventée. On ne publie
-  de vrais chiffres que quand le moteur les produit réellement. Un `0` affirme ; une absence
-  admet. Pas de bloc `usage` tant qu'il n'y a pas de coût réel.
-- **Échec fermé, partout.** `x-hub-token` obligatoire (401 sinon) ; `HUB_TOKEN` absent
-  → 503 (intégration désactivée, pas une panne) ; auth utilisateur non configurée → 503 et
-  rien n'est servi. Comparaisons de jetons en **temps constant**. Jamais de secret en dur.
-- **`no-store` systématique** sur `/hub/summary` : un summary est un instantané.
-- **App privée par défaut.** Elle affiche des données personnelles → login Google
-  mono-adresse (`AUTHORIZED_EMAIL`) + middleware fail-closed. Toute NOUVELLE route qui
-  affiche des données reste DERRIÈRE le middleware.
+- **No fake data, appliqué à la lettre.** Une unité non déclarée ⇒ on affiche la valeur
+  brute, jamais un pourcentage deviné (un état de charge de 1 % affiché « 100 % » serait
+  faux au moment où l'information compte le plus). Un coût d'entretien absent reste absent.
+  Un dépassement de bail est chiffré en kilomètres tant que le tarif au km est inconnu.
+- **Panne ≠ absence de données.** Les deux donnent un écran vide, mais l'une veut dire
+  « le véhicule n'a rien envoyé » et l'autre « CarAI est cassé ». Le summary publie `error`
+  dans le second cas, jamais `building`.
+- **Une mesure porte TOUJOURS sa source et son `recordedAt`** (instant de la mesure côté
+  véhicule, pas de la réception). La fraîcheur réelle est de 30-60 min : sans horodatage,
+  l'affichage laisserait croire au temps réel.
+- **Deux sources qui se contredisent sont montrées toutes les deux.** Jamais de moyenne,
+  jamais d'arbitrage silencieux — 46 % entre 45 et 47 est un chiffre que le véhicule n'a
+  jamais affiché.
+- **App privée, échec fermé.** Login Google mono-adresse, middleware fail-closed,
+  `requireSession()` revérifié côté serveur. Jamais de secret en base ni côté client.
+- **Aucune commande à taper.** Migrations appliquées au démarrage (`lib/migrations.ts`).
 
-## Les deux pièges qui ont coûté cher
+## Les routes hors middleware, et pourquoi
 
-**1. `/hub/summary` doit rester HORS du middleware d'auth utilisateur.**
-Il porte sa propre auth (le jeton). S'il tombe sous le garde de session, le hub reçoit une
-redirection HTML vers `/login` au lieu du JSON → widget « injoignable » en permanence.
-Le symptôme est trompeur : l'app marche parfaitement dans ton navigateur (tu es connecté),
-seul le hub voit le problème. Vécu par JobAI, qui l'a appelé « le défaut n°1 du squelette ».
-Verrouillé par `tests/auth.test.ts` — ne pas supprimer ce test.
+`ROUTES_A_AUTH_PROPRE` (`lib/authGuard.ts`) énumère **une par une** les routes appelées par
+des machines : `/hub/summary`, les deux webhooks, le cron. Chacune porte sa propre auth.
 
-**2. Le hub polle toutes les ~15 s, et il ne peut pas deviner ce que ça te coûte.**
-Si produire ton summary consomme une ressource BORNÉE (exécution Apps Script, appel d'API
-tierce, requête lourde), mets un **cache court dans ton handler**. DriveAI a découvert que
-19 polls sur 20 renvoyaient des octets identiques, chacun facturé sur un quota dur de
-90 min/jour partagé avec son moteur. Règle : si la donnée ne bouge qu'aux N minutes, un
-cache de ~N/5 ne perd aucune fraîcheur. ⚠️ Ne JAMAIS mettre une **panne** en cache — un
-échec doit rester observable et le prochain appel doit réessayer.
+⚠️ **Jamais un préfixe de dossier.** Une nouvelle route non déclarée tombe derrière le garde
+par défaut — le mauvais côté de l'oubli doit être le côté sûr. Verrouillé par
+`tests/auth.test.ts`, qui compare aussi la liste au matcher du middleware.
 
-## Publier au hub — ce qui compte
+⚠️ Pour Smartcar l'enjeu est concret : une route qui répond 302 ou 503 compte comme un
+**échec de livraison**, et six échecs suffisent à ce que Smartcar **désactive le webhook**.
+Le flux s'arrête alors en silence. C'est pour ça que `webhook_deliveries` existe et que le
+summary alerte au-delà de 6 h sans livraison.
 
-- **`dataAsOf` ≠ `generatedAt`.** `generatedAt` = quand tu as fabriqué la réponse (toujours
-  « maintenant »). `dataAsOf` = quand la DONNÉE a été rafraîchie. Sans lui, le hub ne peut
-  pas distinguer « à jour » de « figé depuis trois jours ».
-- **Période des coûts** (`usage.cost.period`) : le hub ne fusionne **jamais** deux périodes
-  différentes — il l'a fait, ça produisait un montant qui n'existait pas. Choisir `total`
-  sauf raison explicite : c'est ce que publient BatchChef et FinanceAI, donc les coûts
-  s'agrègent entre eux. `mois` apparaîtra dans un total séparé.
-- **Un champ additif optionnel ne casse rien.** Les schémas strippent les clés inconnues :
-  un producteur peut publier `usage` avant que tous les consommateurs ne soient re-pinnés.
-- **Le hub ne connaît aucune app en particulier.** Il rend ce que le summary contient. Si tu
-  veux quelque chose de spécifique à l'écran, ça passe par le contrat, pas par du code hub.
+## La déduplication est structurelle, pas un détail
 
-## Au fork — checklist
+Smartcar livre **tous** les signaux souscrits à chaque événement, alors que le véhicule ne
+se rafraîchit qu'aux 30-60 min. L'index unique `(source, metric_type, recorded_at)` fait
+qu'une mesure est identifiée par l'instant où le *véhicule* l'a produite : une re-livraison
+ne crée rien. C'est aussi ce qui rend l'ingestion idempotente sans faire confiance à un
+identifiant d'événement. Corollaire assumé : quand une source ne date pas ses mesures,
+`recorded_at` retombe sur la réception et la dédup ne joue plus — mieux vaut des doublons
+visibles qu'une fraîcheur inventée.
 
-1. Personnaliser `APP` (id/name/url/color) dans `app/hub/summary/route.ts`. L'`id` doit
-   correspondre EXACTEMENT à l'entrée de `lib/sources.ts` côté Hubperso.
-2. Configurer l'environnement (cf. `.env.example`) : `HUB_TOKEN`, `AUTH_SECRET`,
-   `AUTHORIZED_EMAIL`, `GOOGLE_CLIENT_ID/SECRET`.
-3. Déclarer l'app dans `lib/sources.ts` du hub + la variable `HUB_TOKEN_<ID>`.
-   ⚠️ C'est du **code** côté hub → ça exige un redéploiement du hub, pas juste une variable.
-4. Remplacer `buildingSummary(...)` par un vrai summary quand le moteur produit des données.
-5. **Si l'app a une base** : ajouter `"vercel-build": "npm run db:migrate && next build"`
-   (Vercel l'utilise à la place de `build` quand il existe) OU appliquer les migrations au
-   démarrage. Exigence de Marc : **ne jamais avoir à lancer une commande sur son PC**.
-6. Tenir `HANDOVER.md` (état courant, à lire en premier) et `BACKLOG.md` dès la 1ʳᵉ session.
+## Ce qui n'a pas pu être vérifié (à faire quand le réseau le permet)
+
+Deux blocages de la session de création, tous deux **documentés dans le code concerné** :
+
+1. **`smartcar.com` est filtré par la politique d'egress** → les noms exacts des signaux V3
+   n'ont pas pu être confirmés (seuls `tractionbattery-stateofcharge` et
+   `odometer-traveleddistance` le sont). D'où le mapping à trois niveaux de
+   `lib/smartcar/signals.ts` — code exact, puis groupe, puis code brut — qui ne jette
+   **aucune** donnée même quand un nom est mal deviné. Corriger la table quand la doc est
+   lisible ne fait perdre aucun historique (`signal_code` garde toujours le code d'origine).
+2. **`toyota-na` est une bibliothèque Python inaccessible** → l'adaptateur réseau Toyota
+   (`lib/toyota/client.ts`) est **déclaré, pas deviné**. Des URLs plausibles auraient produit
+   du code qui compile et échoue au premier appel, en faisant croire à un changement d'API
+   côté Toyota. La marche à suivre pour le brancher est dans l'en-tête du fichier.
 
 ## Vérifications avant commit
 
@@ -79,35 +83,23 @@ npm run typecheck && npm run lint && npm run test && npm run build
 ```
 
 *(`lint` = ESLint CLI : `next lint` est déprécié et retiré dans Next 16. Le bloc `ignores`
-de `eslint.config.mjs` est indispensable — l'ESLint CLI n'ignore pas `node_modules`/`.next`
-implicitement, contrairement à `next lint` : 4 122 faux positifs mesurés chez JobAI.)*
+de `eslint.config.mjs` est indispensable.)* La CI rejoue ce gate, plus un job `audit`
+séparé — un avis de sécurité paraît sans qu'une ligne n'ait changé, et mêlé au gate il
+peindrait un dépôt sain en rouge jusqu'à ce qu'on prenne l'habitude du rouge.
 
-La **CI** (`.github/workflows/ci.yml`) rejoue ce gate et part avec le fork — c'est voulu :
-les apps nées de ce template ont démarré sans aucune vérification automatisée, et l'une a
-laissé vivre une injection SQL en production faute de quoi que ce soit qui se déclenche.
-Un job `audit` **séparé** (`npm audit --omit=dev`, aussi en hebdomadaire) complète le gate :
-un avis de sécurité paraît sans qu'une ligne n'ait changé, et mêlé au gate il peindrait un
-dépôt sain en rouge sans rapport avec le code — c'est ainsi qu'une CI cesse d'être lue.
+## Après un merge : vérifier le DÉPLOIEMENT, pas seulement la CI
 
-## Documentation
-
-- `CLAUDE.md` (ce fichier) se charge à **chaque session** → il reste **court**. ⚠️ Leçon
-  FinanceAI : le sien avait atteint 1 777 lignes (~36 500 tokens par session) tout en
-  affirmant être « dense et court ». Les leçons détaillées vont dans `docs/`, jamais ici.
-- `HANDOVER.md` — état courant, à lire en premier à chaque reprise.
-- `BACKLOG.md` — tâches. ⚠️ Un item peut être **périmé** (réglé ailleurs) : vérifier l'état
-  réel avant de coder.
-- ⚠️ **Doc périmée = pire que pas de doc.** Le README de JobAI a annoncé « rien n'est
-  déployé » pendant des semaines alors que l'app tournait avec des données réelles — et
-  promettait en même temps une fonctionnalité IA qui n'existait pas. Mettre à jour la doc
-  touchée dans la MÊME PR que le code.
+**CI verte ne veut pas dire « en ligne ».** Vécu le 31/07/2026 dans l'écosystème : quatre
+projets Vercel ont cessé de créer des déploiements pendant ~3 h ; le commit d'en-têtes de
+sécurité de Hubperso et BatchChef est resté **cinq jours** en attente sans que personne ne
+le voie. Après un merge qui change ce qui est servi, vérifier qu'un déploiement de
+production existe et qu'il est `READY`, puis contrôler l'effet sur la **réponse HTTP réelle**.
 
 ## Style (hérité du CLAUDE.md global de Marc)
 
-- Réponses, commits et docs **en français** (`feat:`, `fix:`, `docs:`, …). Pas d'emojis
-  dans le chat sauf demande explicite.
+- Réponses, commits et docs **en français** (`feat:`, `fix:`, `docs:`…). Pas d'emojis.
 - TypeScript strict, pas de `any` silencieux. Erreurs honnêtes, jamais avalées.
+- Logique métier en **fonctions pures**, hors des I/O — c'est ce qui rend le reste testable.
 - Ne pas imposer le dark mode : `prefers-color-scheme` décide.
-- **Planchers de version, jamais redescendus** : documenter dans `package.json` (clé `//`)
-  toute version minimale imposée par une faille — ex. `drizzle-orm ≥ 0.45.2`
-  (GHSA-gpj5-g38j-94v9, injection SQL, HIGH) chez BatchChef.
+- **Planchers de version, jamais redescendus** : `drizzle-orm ≥ 0.45.2`
+  (GHSA-gpj5-g38j-94v9, injection SQL, HIGH), documenté dans `package.json`.

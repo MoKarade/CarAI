@@ -18,6 +18,7 @@
 // automatique transforme un incident de quelques heures en perte permanente et silencieuse.
 
 import type { SanteToyota } from "@/lib/config";
+import type { Env } from "@/lib/env";
 
 /** Nombre d'échecs consécutifs avant désactivation automatique (Doc 3 §6.1). */
 export const SEUIL_DESACTIVATION = 5;
@@ -43,7 +44,7 @@ export const DELAI_REACTIVATION_HEURES = 24;
 export function moduleActif(params: {
   sante: SanteToyota;
   maintenant: Date;
-  env?: NodeJS.ProcessEnv;
+  env?: Env;
 }): { actif: boolean; raison: string } {
   const { sante, maintenant, env = process.env } = params;
 
