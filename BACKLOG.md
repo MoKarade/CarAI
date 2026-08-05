@@ -15,7 +15,12 @@ Voir `HANDOVER.md` pour la marche à suivre détaillée.
 - [ ] `[INFRA-06]` Lancer le Connect depuis CarAI (autorisation du véhicule)
 - [ ] `[INFRA-07]` `HUB_TOKEN` côté CarAI **et** `HUB_TOKEN_CARAI` côté Hubperso
       (⚠️ exige un redéploiement de Hubperso — l'ajout de l'app est du code)
-- [ ] `[INFRA-08]` `CRON_SECRET` (seulement si le module Toyota est activé)
+- [ ] `[INFRA-08]` `CRON_SECRET` (seulement si le module Toyota est activé), puis
+      décommenter le `schedule` de `.github/workflows/toyota-poll.yml` et poser les
+      secrets de dépôt `CARAI_URL` / `CRON_SECRET`.
+      ⚠️ Le poll ne passe PAS par un cron Vercel : le plan Hobby n'autorise que des
+      crons **quotidiens**, et `0 */2 * * *` fait échouer le déploiement. Voir
+      « Le poll Toyota ne passe pas par Vercel » dans `CLAUDE.md`.
 
 ## À faire dès que des données réelles arrivent
 

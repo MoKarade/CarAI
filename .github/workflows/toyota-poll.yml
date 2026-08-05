@@ -1,0 +1,85 @@
+# Déclencheur du poll Toyota — REMPLAÇANT GRATUIT du cron Vercel.
+#
+# ── POURQUOI CE FICHIER EXISTE ───────────────────────────────────────────────────────
+# Le Doc 3 §5.2 fixe le poll léger à toutes les 2 h. Le plan Vercel Hobby n'autorise que
+# des crons QUOTIDIENS : un `vercel.json` portant `0 */2 * * *` fait ÉCHOUER le
+# déploiement avec « Hobby accounts are limited to daily cron jobs ». Passer au plan Pro
+# irait contre la règle « tout gratuit » de l'écosystème.
+#
+# GitHub Actions permet la fréquence voulue sans rien payer : un run ne fait qu'un appel
+# HTTP de quelques secondes, très loin du quota mensuel gratuit.
+#
+# ── POURQUOI IL N'EST PAS PLANIFIÉ AUJOURD'HUI ───────────────────────────────────────
+# Le module Toyota est DÉSACTIVÉ par défaut, et son activation est conditionnée à deux
+# vérifications que Marc seul peut faire (Doc 3 §2 : abonnement Connected Services actif,
+# et compatibilité réelle d'un compte toyota.ca — un vrai inconnu technique).
+#
+# Tant qu'il est désactivé, chaque run répondrait « module désactivé » : douze exécutions
+# vertes par jour dans l'onglet Actions, pour rien. C'est exactement ainsi qu'une CI cesse
+# d'être lue — on prend l'habitude de voir passer des runs qu'on ne regarde plus, et le
+# jour où l'un devient rouge, personne ne le voit.
+#
+# ── POUR L'ACTIVER (le jour où TOYOTA_NA_ENABLED=true est posé) ──────────────────────
+#  1. Décommenter le bloc `schedule` ci-dessous.
+#  2. Poser deux secrets de dépôt (Settings → Secrets and variables → Actions) :
+#       CARAI_URL    = https://carai.hubperso.com
+#       CRON_SECRET  = la MÊME valeur que la variable CRON_SECRET de Vercel
+#  3. Vérifier une première fois à la main : onglet Actions → ce workflow → Run workflow.
+
+name: Poll Toyota
+
+on:
+  # Déclenchement manuel — le seul actif aujourd'hui. Sert aussi à valider la
+  # configuration avant de passer au planifié.
+  workflow_dispatch:
+
+  # ⚠️ À DÉCOMMENTER seulement quand le module Toyota est réellement activé.
+  # schedule:
+  #   - cron: "0 */2 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  # Deux cycles de poll simultanés enverraient deux réveils au véhicule. Le plancher
+  # anti-réveil de `deciderPoll` s'appuie sur un état persisté, qu'une course pourrait
+  # lire avant que l'autre ne l'écrive.
+  group: toyota-poll
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Déclencher un cycle de poll
+        env:
+          CARAI_URL: ${{ secrets.CARAI_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${CARAI_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::Secrets CARAI_URL et CRON_SECRET requis (voir l'en-tête de ce fichier)."
+            exit 1
+          fi
+
+          # -w écrit le code HTTP en dernière ligne : le corps ET le statut sont jugés.
+          # Un 200 seul ne prouverait rien — la route répond 200 même quand le module est
+          # désactivé, et c'est voulu (ce n'est pas une panne).
+          reponse=$(curl -sS --max-time 60 -w '\n%{http_code}' \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${CARAI_URL}/api/cron/toyota-poll")
+
+          statut=$(echo "$reponse" | tail -n1)
+          corps=$(echo "$reponse" | sed '$d')
+
+          echo "HTTP ${statut}"
+          echo "$corps"
+
+          # 401 = secret qui ne correspond pas ; 503 = CRON_SECRET absent côté Vercel.
+          # Les deux sont des erreurs de configuration, pas des pannes du véhicule :
+          # elles doivent faire échouer le run pour être visibles.
+          if [ "$statut" != "200" ]; then
+            echo "::error::Le poll a répondu ${statut} — vérifier CRON_SECRET des deux côtés."
+            exit 1
+          fi

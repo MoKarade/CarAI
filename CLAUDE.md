@@ -51,6 +51,18 @@ par défaut — le mauvais côté de l'oubli doit être le côté sûr. Verrouil
 Le flux s'arrête alors en silence. C'est pour ça que `webhook_deliveries` existe et que le
 summary alerte au-delà de 6 h sans livraison.
 
+## Le poll Toyota ne passe pas par Vercel
+
+⚠️ **Ne jamais remettre un bloc `crons` dans `vercel.json`.** Le Doc 3 §5.2 fixe le poll
+léger à toutes les 2 h ; le plan **Vercel Hobby n'autorise que des crons quotidiens**, et
+une expression comme `0 */2 * * *` fait **échouer le déploiement** avec « Hobby accounts
+are limited to daily cron jobs ». Passer au plan Pro irait contre la règle « tout gratuit ».
+
+Le déclencheur vit donc dans `.github/workflows/toyota-poll.yml` (GitHub Actions, gratuit à
+cette fréquence). Il est en **déclenchement manuel seulement** tant que le module Toyota est
+désactivé : douze runs verts par jour pour une route qui répond « module désactivé », c'est
+exactement ainsi qu'un onglet Actions cesse d'être lu.
+
 ## La déduplication est structurelle, pas un détail
 
 Smartcar livre **tous** les signaux souscrits à chaque événement, alors que le véhicule ne
