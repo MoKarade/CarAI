@@ -2,6 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  challengeBienForme,
   hmacHex,
   lireEvenement,
   livraisonAuthentique,
@@ -169,5 +170,48 @@ describe("identifiant du Connect", () => {
     const { ressembleAUuid } = await import("@/lib/smartcar/auth");
     expect(ressembleAUuid("a1b2c3d4-e5f6-7890-abcd-ef1234567890")).toBe(true);
     expect(ressembleAUuid("client_01KZ9HBPCDY29DC7S9NRNJJ72H")).toBe(false);
+  });
+});
+
+// ── La vérification du webhook (incident du 05/08/2026) ────────────────────────────
+// Smartcar a répondu « verification request responded with a non-2xx status: 401 » :
+// l'événement de vérification n'est PAS signé, et notre route exigeait une signature
+// avant de répondre au challenge. Tant que cette vérification échoue, AUCUNE donnée
+// n'est livrée — ces tests verrouillent la forme exacte du payload de référence.
+describe("événement de vérification", () => {
+  it("lit le challenge sous `data` — la forme réelle de Smartcar", () => {
+    // Payload issu du handler de référence : payload.get('data', {}).get('challenge').
+    const ev = lireEvenement({
+      eventType: "VERIFY",
+      data: { challenge: "challenge_063f9ab0f106cc06b7d06e7945b4eced" },
+    });
+    expect(ev.type).toBe("VERIFY");
+    expect(ev.challenge).toBe("challenge_063f9ab0f106cc06b7d06e7945b4eced");
+  });
+
+  it("produit la réponse attendue : { challenge: <hmac hex> }", () => {
+    const r = reponseChallenge("challenge_063f9ab0f106cc06b7d06e7945b4eced", TOKEN);
+    expect(Object.keys(r)).toEqual(["challenge"]);
+    expect(r.challenge).toMatch(/^[0-9a-f]{64}$/);
+  });
+});
+
+describe("challengeBienForme — ferme l'oracle de signature", () => {
+  it("accepte la forme réelle des challenges", () => {
+    expect(challengeBienForme("challenge_063f9ab0f106cc06b7d06e7945b4eced")).toBe(true);
+    expect(challengeBienForme("challenge_s4mpleR4nd0mStr1ng")).toBe(true);
+  });
+
+  it("REFUSE tout ce qui pourrait être un corps de livraison", () => {
+    // Le cœur du garde : répondre au challenge revient à SIGNER la chaîne fournie. Sans
+    // contrainte de forme, un tiers ferait signer le corps d'une fausse livraison puis
+    // le renverrait avec cette signature — l'endpoint serait la clé de sa propre serrure.
+    expect(challengeBienForme('{"eventType":"VEHICLE_STATE","data":{}}')).toBe(false);
+    expect(challengeBienForme("challenge_{}")).toBe(false);
+    expect(challengeBienForme('challenge_"a"')).toBe(false);
+    expect(challengeBienForme("")).toBe(false);
+    expect(challengeBienForme("challenge_")).toBe(false);
+    expect(challengeBienForme("autre_chose")).toBe(false);
+    expect(challengeBienForme(`challenge_${"a".repeat(129)}`)).toBe(false);
   });
 });

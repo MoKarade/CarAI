@@ -27,6 +27,7 @@
 
 import {
   HEADER_SIGNATURE,
+  challengeBienForme,
   lireEvenement,
   livraisonAuthentique,
   reponseChallenge,
@@ -55,19 +56,6 @@ export async function POST(request: Request): Promise<Response> {
   // Corps BRUT, lu une seule fois. Tout le reste part de cette chaîne.
   const corpsBrut = await request.text();
 
-  if (
-    !livraisonAuthentique({
-      corpsBrut,
-      signature: request.headers.get(HEADER_SIGNATURE),
-      managementToken,
-    })
-  ) {
-    return Response.json(
-      { error: "signature invalide" },
-      { status: 401, headers: NO_STORE },
-    );
-  }
-
   let charge: unknown;
   try {
     charge = corpsBrut ? JSON.parse(corpsBrut) : null;
@@ -80,13 +68,49 @@ export async function POST(request: Request): Promise<Response> {
 
   const evenement = lireEvenement(charge);
 
-  // 1. Le challenge passe AVANT tout le reste — y compris avant l'état de la base. Sinon un
-  //    souci de configuration de base empêcherait la vérification du webhook, donc toute
-  //    livraison future, pour une raison sans rapport.
-  if (evenement.type === "VERIFY" && evenement.challenge) {
+  // ══ 1. LE CHALLENGE PASSE AVANT LA VÉRIFICATION DE SIGNATURE ═══════════════════════
+  //
+  // L'événement de vérification n'est PAS signé — le handler de référence de Smartcar y
+  // répond sans rien vérifier. Exiger une signature ici renvoyait 401 et faisait échouer
+  // la vérification du webhook (vécu le 05/08/2026 : « verification request responded
+  // with a non-2xx status: 401 »). Or tant que la vérification échoue, Smartcar ne livre
+  // AUCUNE donnée : l'ordre de ces deux blocs décide si le flux existe ou non.
+  //
+  // ⚠️ Répondre à un challenge revient à SIGNER une chaîne fournie par l'appelant. Sans
+  // garde, l'endpoint deviendrait un oracle : composer le corps d'une fausse livraison,
+  // le faire signer en le présentant comme un challenge, puis le renvoyer avec cette
+  // signature. `challengeBienForme` l'interdit — on ne signe que des chaînes
+  // `challenge_…` alphanumériques, structurellement incapables d'être un corps JSON.
+  //
+  // Ce bloc passe aussi avant l'état de la base : un souci de configuration ne doit pas
+  // empêcher la vérification du webhook, donc toute livraison future, sans rapport.
+  if (evenement.type === "VERIFY") {
+    if (!evenement.challenge || !challengeBienForme(evenement.challenge)) {
+      console.error("[smartcar] challenge absent ou de forme inattendue — refusé.");
+      return Response.json(
+        { error: "challenge absent ou invalide" },
+        { status: 400, headers: NO_STORE },
+      );
+    }
     return Response.json(reponseChallenge(evenement.challenge, managementToken), {
       headers: NO_STORE,
     });
+  }
+
+  // ══ 2. TOUT LE RESTE EXIGE UNE SIGNATURE VALIDE ════════════════════════════════════
+  // Les livraisons de DONNÉES, elles, sont signées — et rien ne s'écrit en base sans que
+  // cette signature soit vérifiée sur le corps BRUT.
+  if (
+    !livraisonAuthentique({
+      corpsBrut,
+      signature: request.headers.get(HEADER_SIGNATURE),
+      managementToken,
+    })
+  ) {
+    return Response.json(
+      { error: "signature invalide" },
+      { status: 401, headers: NO_STORE },
+    );
   }
 
   // Un VEHICLE_ERROR se journalise et ne casse pas le pipeline (Doc 2 §6.3). On répond 200 :
@@ -114,6 +138,9 @@ export async function POST(request: Request): Promise<Response> {
       eventType: evenement.type,
       signaux: evenement.signaux,
       raw: evenement.raw,
+      // La livraison nous apprend l'identifiant du véhicule — plus fiable que d'aller le
+      // demander à un endpoint (voir `apprendreVehicleId`).
+      vehicleId: evenement.vehicleId,
     });
 
     // `ecrits: 0` n'est PAS une anomalie : c'est le cas normal quand aucun signal n'a bougé

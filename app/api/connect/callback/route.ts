@@ -79,21 +79,37 @@ export async function GET(request: Request): Promise<Response> {
 
   await ecrireConfig(CLE_SMARTCAR_USER, userId);
 
-  // Le véhicule est identifié dans la foulée : sans son `vehicleId`, aucune commande ni
-  // lecture ciblée n'est possible, et attendre le premier webhook pour l'apprendre
-  // laisserait CarAI à moitié branché sans que ce soit visible.
+  // On TENTE d'identifier le véhicule tout de suite, sans en dépendre.
+  //
+  // ⚠️ Cet appel a répondu 404 au premier Connect réel (05/08/2026) : son chemin avait été
+  // deviné, la doc Smartcar étant inaccessible. Le filet est désormais ailleurs — chaque
+  // livraison de webhook porte l'identifiant, et `apprendreVehicleId` le retient. Ce
+  // chemin-ci n'est plus qu'un raccourci : il fait gagner le délai avant la première
+  // livraison quand il marche, et ne coûte rien quand il échoue.
+  let vehiculeIdentifie = false;
   try {
     const contexte = await contexteSmartcar(async () => userId);
     if (contexte) {
       const reponse = await listerVehicules(contexte);
       const vehicleId = premierVehicleId(reponse.data);
-      if (vehicleId) await ecrireConfig(CLE_SMARTCAR_VEHICLE, vehicleId);
+      if (vehicleId) {
+        await ecrireConfig(CLE_SMARTCAR_VEHICLE, vehicleId);
+        vehiculeIdentifie = true;
+      }
     }
   } catch (err) {
-    // L'autorisation est acquise — c'est l'essentiel. L'identification du véhicule pourra
-    // se refaire ; échouer ici ne doit pas annuler le Connect que Marc vient de réussir.
+    // L'autorisation est acquise — c'est l'essentiel. Échouer ici ne doit pas annuler le
+    // Connect que Marc vient de réussir.
     console.error("[connect] identification du véhicule impossible", err);
   }
 
-  versAccueil("Véhicule connecté à Smartcar.", true);
+  // Le message DIT lequel des deux cas s'est produit. Annoncer « véhicule connecté » alors
+  // que son identifiant manque laisserait croire que tout est prêt, et l'échec d'une
+  // commande plus tard paraîtrait inexplicable.
+  versAccueil(
+    vehiculeIdentifie
+      ? "Véhicule connecté à Smartcar."
+      : "Autorisation réussie. L'identifiant du véhicule sera capté à la première livraison du webhook — les commandes fonctionneront à partir de là.",
+    true,
+  );
 }
