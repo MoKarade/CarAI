@@ -1,0 +1,96 @@
+name: CI
+
+# Ce fichier compte double : c'est le squelette des futures apps du hub. Ce qu'il
+# contient, chaque fork l'hérite ; ce qu'il oublie, chaque fork l'oublie. Les quatre
+# apps nées de ce template ont démarré sans CI — trois d'entre elles n'en ont eu une
+# qu'après coup, et l'une a laissé vivre une injection SQL en production faute de
+# quoi que ce soit qui se déclenche.
+#
+# Le job `gate` rejoue EXACTEMENT le gate du CLAUDE.md :
+#   npm run typecheck && npm run lint && npm run test && npm run build
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  # Le cron ne sert qu'au job `audit` : une vulnérabilité paraît sans qu'une ligne
+  # n'ait changé. Lundi 12 h UTC.
+  schedule:
+    - cron: "0 12 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: Gate (typecheck · lint · tests · build)
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # `npm ci` et non `npm install` : le lockfile est committé et fait autorité.
+      - name: Dépendances
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # `eslint .` et non `next lint`, déprécié et retiré dans Next 16. Le bloc
+      # `ignores` d'eslint.config.mjs est indispensable : sans lui, l'ESLint CLI scanne
+      # node_modules et .next (des milliers de faux positifs — mesuré chez JobAI : 4122).
+      - name: Lint
+        run: npm run lint
+
+      - name: Tests
+        run: npm run test
+
+      # Vérifié : le build ne demande AUCUNE variable d'environnement — un fork qui
+      # n'a encore configuré aucun secret voit quand même sa CI passer au vert.
+      - name: Build
+        run: npm run build
+
+  audit:
+    name: Audit des dépendances de production
+    runs-on: ubuntu-latest
+    # Job SÉPARÉ du gate, volontairement : un avis de sécurité paraît sans qu'aucun
+    # commit n'ait eu lieu. Mêlé au gate, il peindrait un dépôt sain en rouge du jour
+    # au lendemain, et on prendrait l'habitude du rouge — c'est exactement ainsi
+    # qu'une CI cesse d'être lue (vécu chez JobAI : quatre commits rouges de suite
+    # sans que personne ne le voie). Séparés, « gate vert / audit rouge » se lit d'un
+    # coup d'œil et désigne la vraie cause.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Dépendances
+        run: npm ci
+
+      # `--omit=dev` : seules les dépendances qui partent en production comptent. Les
+      # avis sur l'outillage de développement ne menacent pas l'app et noieraient le
+      # signal.
+      - name: npm audit (production)
+        run: npm audit --omit=dev
+
+# ── Au fork ───────────────────────────────────────────────────────────────────
+# Rien à changer pour démarrer : ce fichier fonctionne tel quel. Quand l'app aura un
+# moteur, ajouter ses vérifications au job `gate` (jamais dans un job à part : ce qui
+# doit bloquer un merge vit dans le gate). Et si le dépôt part sur `main` seulement,
+# la ligne `master` ci-dessus est sans effet — inutile de la retirer.
+#
+# GitHub désactive les workflows planifiés d'un dépôt resté 60 jours sans activité et
+# le signale par courriel : si l'audit hebdomadaire disparaît, c'est là qu'il faut
+# regarder, pas dans ce fichier.
