@@ -114,6 +114,9 @@ export async function POST(request: Request): Promise<Response> {
       eventType: evenement.type,
       signaux: evenement.signaux,
       raw: evenement.raw,
+      // La livraison nous apprend l'identifiant du véhicule — plus fiable que d'aller le
+      // demander à un endpoint (voir `apprendreVehicleId`).
+      vehicleId: evenement.vehicleId,
     });
 
     // `ecrits: 0` n'est PAS une anomalie : c'est le cas normal quand aucun signal n'a bougé
