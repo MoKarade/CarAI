@@ -30,6 +30,12 @@ export function etatMigrations(): { tentee: boolean; erreur: string | null } {
   return { tentee: enCours !== null, erreur: derniereErreur };
 }
 
+/** Oublie la mémorisation. Utilisé par les tests, et après un échec (voir plus bas). */
+export function reinitialiserMigrations(): void {
+  enCours = null;
+  derniereErreur = null;
+}
+
 /**
  * Applique les migrations en attente. Sans effet si tout est à jour.
  *
@@ -50,8 +56,16 @@ export async function assurerMigrations(): Promise<void> {
     } catch (err) {
       derniereErreur = err instanceof Error ? err.message : String(err);
       console.error("[migrations] application impossible", err);
-      // On ne relance pas : la page doit s'afficher. La prochaine instance réessaiera, et
-      // une table réellement manquante se verra à l'écran plutôt que de passer inaperçue.
+      // On ne relance pas : la page doit s'afficher, et une table réellement manquante se
+      // verra à l'écran plutôt que de passer inaperçue.
+      //
+      // ⚠️ Mais on OUBLIE la mémorisation. Sans cette ligne, une promesse ÉCHOUÉE reste
+      // en cache pour toute la vie du processus : le premier échec (un blip réseau au
+      // démarrage à froid) condamnerait l'instance à ne plus jamais retenter, et l'app
+      // servirait « schéma absent » indéfiniment alors qu'un simple nouvel essai
+      // suffirait. Mémoriser un SUCCÈS est une optimisation ; mémoriser un ÉCHEC est un
+      // verrou définitif.
+      enCours = null;
     }
   })();
 
