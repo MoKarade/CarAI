@@ -55,6 +55,44 @@ export function credentialsSmartcar(
 }
 
 /**
+ * Identifiant à employer pour le flow CONNECT — potentiellement DIFFÉRENT de celui des
+ * appels API.
+ *
+ * ══ POURQUOI DEUX IDENTIFIANTS (incident du 05/08/2026) ══════════════════════════════
+ * Le Doc 2 §3.1 prévient : « deux couches distinctes à ne pas confondre » — l'auth
+ * applicative M2M d'un côté, l'autorisation utilisateur Connect de l'autre. La première
+ * version de ce code utilisait la MÊME valeur pour les deux. Résultat en production :
+ *
+ *     400: Invalid parameter client_id: client_01KZ9…
+ *
+ * Les appels API passaient, le Connect refusait : les deux couches n'attendent pas le
+ * même format — `client_` + ULID pour les API Credentials V3, un UUID pour l'application
+ * côté Connect.
+ *
+ * ⚠️ Impossible de le trancher dans la doc : `smartcar.com` est filtré par la politique
+ * d'egress des sessions qui ont écrit ce code. D'où ce choix — une variable DÉDIÉE et
+ * optionnelle, avec repli sur l'identifiant M2M. Une configuration à une seule valeur
+ * continue de fonctionner ; celle qui en a besoin sépare les deux sans toucher au code.
+ * C'est la seule forme honnête sous incertitude : on ne devine pas, on rend configurable.
+ */
+export function clientIdConnect(env: Env = process.env): string | null {
+  return env.SMARTCAR_CONNECT_CLIENT_ID?.trim() || env.SMARTCAR_CLIENT_ID?.trim() || null;
+}
+
+/**
+ * L'identifiant a-t-il la forme d'un UUID ?
+ *
+ * Sert UNIQUEMENT à produire un message utile quand le Connect échoue — jamais à refuser
+ * une valeur. Smartcar reste seul juge de ce qu'il accepte, et un garde local qui
+ * bloquerait une valeur légitime coûterait plus cher que le message qu'il fait gagner.
+ */
+export function ressembleAUuid(valeur: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    valeur.trim(),
+  );
+}
+
+/**
  * Renvoie un token applicatif valide, depuis le cache si possible.
  *
  * ⚠️ Le cache est un cache de PROCESSUS : vide au démarrage à froid, non partagé entre

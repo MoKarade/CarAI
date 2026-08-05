@@ -138,3 +138,36 @@ describe("silenceWebhook — la panne qui ne fait pas de bruit", () => {
     expect(r.heures).toBeNull();
   });
 });
+
+// ── Les deux couches d'identifiants Smartcar (incident du 05/08/2026) ───────────────
+// Le Connect a refusé l'identifiant des API Credentials avec
+// « 400: Invalid parameter client_id: client_01KZ9… ». Les deux couches du Doc 2 §3.1
+// n'attendent pas la même valeur ; ces tests verrouillent la séparation ET le repli.
+describe("identifiant du Connect", () => {
+  it("préfère SMARTCAR_CONNECT_CLIENT_ID quand il est posé", async () => {
+    const { clientIdConnect } = await import("@/lib/smartcar/auth");
+    expect(
+      clientIdConnect({
+        SMARTCAR_CLIENT_ID: "client_01KZ9HBPCDY29DC7S9NRNJJ72H",
+        SMARTCAR_CONNECT_CLIENT_ID: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      }),
+    ).toBe("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
+  });
+
+  it("retombe sur SMARTCAR_CLIENT_ID — une config à une seule valeur marche encore", async () => {
+    const { clientIdConnect } = await import("@/lib/smartcar/auth");
+    expect(clientIdConnect({ SMARTCAR_CLIENT_ID: "abc" })).toBe("abc");
+  });
+
+  it("ignore une valeur blanche plutôt que d'envoyer des espaces à Smartcar", async () => {
+    const { clientIdConnect } = await import("@/lib/smartcar/auth");
+    expect(clientIdConnect({ SMARTCAR_CONNECT_CLIENT_ID: "   ", SMARTCAR_CLIENT_ID: "abc" })).toBe("abc");
+    expect(clientIdConnect({})).toBeNull();
+  });
+
+  it("reconnaît la FORME d'un UUID — pour diagnostiquer, jamais pour refuser", async () => {
+    const { ressembleAUuid } = await import("@/lib/smartcar/auth");
+    expect(ressembleAUuid("a1b2c3d4-e5f6-7890-abcd-ef1234567890")).toBe(true);
+    expect(ressembleAUuid("client_01KZ9HBPCDY29DC7S9NRNJJ72H")).toBe(false);
+  });
+});
