@@ -1,0 +1,88 @@
+:root {
+  --bg: oklch(97% 0.008 90);
+  --surface: oklch(99.5% 0.003 90);
+  --text: oklch(23% 0.02 265);
+  --text-soft: oklch(48% 0.015 265);
+  --border: oklch(90% 0.008 265);
+  --accent: oklch(58% 0.19 275);
+  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: oklch(17% 0.015 265);
+    --surface: oklch(21% 0.018 265);
+    --text: oklch(94% 0.01 265);
+    --text-soft: oklch(72% 0.015 265);
+    --border: oklch(31% 0.02 265);
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+* {
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.shell {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+}
+.card {
+  max-width: 34rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: clamp(1.5rem, 1rem + 3vw, 2.75rem);
+  box-shadow: 0 1px 2px oklch(0% 0 0 / 0.04), 0 12px 32px -16px oklch(0% 0 0 / 0.18);
+  position: relative;
+  overflow: hidden;
+}
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent), transparent 72%);
+}
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+h1 {
+  font-size: clamp(1.9rem, 1.4rem + 2vw, 2.6rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0.25rem 0 0.9rem;
+}
+.lead {
+  color: var(--text);
+  margin-bottom: 0.9rem;
+}
+.hint {
+  color: var(--text-soft);
+  font-size: 0.9rem;
+}
+code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.88em;
+  background: oklch(60% 0.02 265 / 0.12);
+  padding: 0.1em 0.35em;
+  border-radius: 5px;
+}
