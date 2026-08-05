@@ -93,17 +93,28 @@ function texteOuNull(valeur: unknown): string | null {
 export function lireEvenement(charge: unknown): EvenementWebhook {
   const racine =
     charge && typeof charge === "object" ? (charge as Record<string, unknown>) : {};
+
+  // ⚠️ La charge réelle vit sous `data` — confirmé par le handler de référence de
+  // Smartcar : `payload.get('data', {}).get('challenge')`. La première version de ce code
+  // ne regardait que sous `payload`, d'où un challenge jamais trouvé. On accepte les deux
+  // (plus la racine) : ça ne coûte rien et ça survit à un renommage.
+  const donnees =
+    racine.data && typeof racine.data === "object"
+      ? (racine.data as Record<string, unknown>)
+      : {};
   const payload =
     racine.payload && typeof racine.payload === "object"
       ? (racine.payload as Record<string, unknown>)
       : {};
 
   const nomBrut =
-    texteOuNull(lire(racine, "eventName", "eventType", "type", "event")) ?? "";
+    texteOuNull(lire(racine, "eventType", "eventName", "type", "event")) ?? "";
   const nom = nomBrut.toUpperCase();
 
   const challenge =
-    texteOuNull(lire(payload, "challenge")) ?? texteOuNull(lire(racine, "challenge"));
+    texteOuNull(lire(donnees, "challenge")) ??
+    texteOuNull(lire(payload, "challenge")) ??
+    texteOuNull(lire(racine, "challenge"));
 
   // Un événement portant un challenge EST une vérification, même si le nom d'événement
   // diffère de ce qu'on attendait. On se fie au contenu, pas à l'étiquette.
@@ -134,6 +145,30 @@ export function lireEvenement(charge: unknown): EvenementWebhook {
 /** Réponse au défi de vérification : le challenge, haché avec le token de management. */
 export function reponseChallenge(challenge: string, managementToken: string): { challenge: string } {
   return { challenge: hmacHex(managementToken, challenge) };
+}
+
+/**
+ * Un challenge a-t-il la FORME attendue ? `challenge_` suivi d'alphanumérique.
+ *
+ * ══ CE GARDE N'EST PAS COSMÉTIQUE : IL FERME UN ORACLE DE SIGNATURE ══════════════════
+ *
+ * L'événement de vérification n'est PAS signé — le handler de référence de Smartcar y
+ * répond sans vérifier quoi que ce soit. Il faut donc bien répondre au challenge AVANT le
+ * contrôle de signature, sinon la vérification échoue en 401 (vécu le 05/08/2026).
+ *
+ * Mais répondre à un challenge arbitraire revient à signer, sur demande, n'importe quelle
+ * chaîne avec le token de management. Un tiers pourrait alors : (1) composer le corps
+ * JSON d'une fausse livraison, (2) nous le faire signer en le présentant comme un
+ * challenge, (3) renvoyer ce corps avec la signature obtenue — qui passerait le contrôle.
+ * L'endpoint deviendrait la clé de sa propre serrure.
+ *
+ * La contrainte de forme casse l'attaque : un corps JSON commence par `{`, jamais par
+ * `challenge_`, et ne peut pas être uniquement alphanumérique. On ne signe donc que des
+ * chaînes structurellement incapables d'être une livraison. La borne de longueur ferme
+ * les variantes exotiques.
+ */
+export function challengeBienForme(valeur: string): boolean {
+  return /^challenge_[A-Za-z0-9]{1,128}$/.test(valeur);
 }
 
 /**
