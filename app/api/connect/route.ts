@@ -7,7 +7,7 @@
 import { redirect } from "next/navigation";
 import { randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
-import { credentialsSmartcar } from "@/lib/smartcar/auth";
+import { clientIdConnect, credentialsSmartcar } from "@/lib/smartcar/auth";
 import { construireUrlConnect } from "@/lib/smartcar/connect";
 import { requireSession } from "@/lib/session";
 
@@ -25,6 +25,17 @@ export async function GET(request: Request): Promise<Response> {
         error:
           "Smartcar non configuré : pose SMARTCAR_CLIENT_ID et SMARTCAR_CLIENT_SECRET dans l'environnement.",
       },
+      { status: 503 },
+    );
+  }
+
+  // ⚠️ Le Connect n'utilise PAS forcément le même identifiant que les appels API — voir
+  // `clientIdConnect` dans lib/smartcar/auth.ts. Confondre les deux produit un
+  // « 400: Invalid parameter client_id » côté Smartcar, vécu le 05/08/2026.
+  const clientId = clientIdConnect();
+  if (!clientId) {
+    return Response.json(
+      { error: "Aucun identifiant Smartcar configuré pour le Connect." },
       { status: 503 },
     );
   }
@@ -47,7 +58,7 @@ export async function GET(request: Request): Promise<Response> {
 
   redirect(
     construireUrlConnect({
-      clientId: credentials.clientId,
+      clientId,
       redirectUri,
       state,
       mode: process.env.SMARTCAR_MODE === "test" ? "test" : "live",
