@@ -1,131 +1,92 @@
-# app-template
+# CarAI
 
-Squelette d'app pour l'écosystème hub perso. Toute nouvelle app `<nom>.hubperso.com` part
-d'ici. Deux choses sont déjà branchées et testées :
+Suivi complet d'un véhicule électrique (Toyota bZ XLE AWD 2026) : état de la batterie,
+charge, position, odomètre, verrouillage, historique d'entretien. Tout est conservé dans le
+temps pour permettre graphiques et projections — dont le suivi du kilométrage face à
+l'allocation du bail.
 
-1. **`GET /hub/summary`** conforme au contrat
-   [`@mokarade/hub-contract`](https://github.com/MoKarade/hub-contract), avec auth
-   `x-hub-token` en temps constant — l'app apparaît dans le hub dès le premier déploiement,
-   honnêtement « en construction » (`buildingSummary`).
-2. **Un login Google mono-adresse** (Auth.js v5) + middleware **fail-closed** — parce que
-   ces apps affichent des données personnelles réelles, et que les quatre apps existantes
-   ont toutes fini par avoir besoin exactement de ça.
+App de l'écosystème [hub perso](https://hubperso.com), à côté de FinanceAI, DriveAI, JobAI
+et BatchChef. Privée, derrière un login Google mono-adresse.
 
-> Ce template condense ce que **Hubperso, FinanceAI, DriveAI, BatchChef et JobAI** ont
-> appris en production. Les avertissements ⚠️ viennent de vrais bugs.
+## Ce qu'elle fait
 
-## Ce qui est déjà branché
+- **Collecte** en continu depuis Smartcar (webhooks) et, en option, depuis une source
+  Toyota non officielle.
+- **Conserve** chaque mesure horodatée, indéfiniment, dans Postgres.
+- **Publie** un résumé au hub perso (`GET /hub/summary`, contrat v1).
+- **Expose** l'état et les commandes à Claude via un serveur MCP (`mcp/`).
 
-| Fichier | Rôle |
-|---|---|
-| `app/hub/summary/route.ts` | Endpoint du hub : 503 sans `HUB_TOKEN`, 401 sans jeton valide, `no-store`, summary `building` |
-| `lib/hubToken.ts` | Comparaison de jeton en temps constant (SHA-256 + `timingSafeEqual`) |
-| `auth.ts` | Auth.js v5, Google, **une seule** adresse admise (`AUTHORIZED_EMAIL`) |
-| `middleware.ts` | Garde global fail-closed ; exclut `/hub/summary` (auth par jeton) |
-| `lib/authGuard.ts` | Décision de garde en fonctions **pures**, testables |
-| `lib/authConfigured.ts` | Refuse tout si `AUTH_SECRET`/`AUTHORIZED_EMAIL` manquent |
-| `app/login/page.tsx` | Page publique, messages d'erreur honnêtes et distincts |
-| `tests/` | 17 tests : contrat + garde d'accès |
-| `.github/workflows/ci.yml` | Gate (typecheck · lint · test · build) + job `audit` séparé |
+## Stack
 
-## ⚠️ Les deux pièges à ne pas rejouer
+Next.js 15 (App Router, Server Components) · Auth.js v5 (Google, une seule adresse) ·
+Neon + Drizzle · Zod · Vitest · `@modelcontextprotocol/sdk`. Déploiement Vercel sur
+`carai.hubperso.com`.
 
-**`/hub/summary` doit rester hors du middleware d'auth utilisateur.** Il porte sa propre
-auth. S'il tombe derrière la session, le hub reçoit une redirection HTML au lieu du JSON →
-widget « injoignable » en permanence, alors que l'app marche parfaitement dans ton
-navigateur. JobAI l'a appelé « le défaut n°1 du squelette ». Verrouillé par `tests/auth.test.ts`.
+## Deux sources, et une règle qui ne bouge pas
 
-**Le hub polle toutes les ~15 s.** S'il coûte quelque chose de borné de produire ton summary
-(Apps Script, API tierce, requête lourde), mets un cache court **dans ton handler** — le hub
-ne peut pas deviner ce que ça te coûte. DriveAI a découvert que 19 polls sur 20 renvoyaient
-des octets identiques, chacun facturé sur un quota dur. Ne jamais mettre une **panne** en cache.
+**Smartcar** est le socle : API officielle, OAuth propre, webhooks. **Toyota NA** est une
+source complémentaire **non officielle** qui tape l'API mobile de Toyota — fragile par
+nature, et déjà cassée deux fois dans l'histoire de cet écosystème (retrait DMCA en 2022,
+puis 2FA obligatoire).
 
-## Forker une nouvelle app
+Si Toyota tombe, **CarAI continue normalement sur Smartcar seul**. Le module est désactivé
+par défaut, s'auto-désactive après cinq échecs consécutifs, et retente 24 h plus tard.
 
-1. **Cloner** ce template sous un nouveau repo (ou « Use this template » sur GitHub).
-2. **Personnaliser l'identité** dans `app/hub/summary/route.ts` :
-   ```ts
-   const APP = {
-     id: "mon-app",              // kebab-case, stable — doit matcher lib/sources.ts du hub
-     name: "Mon App",            // 1 à 30 caractères
-     url: "https://mon-app.hubperso.com",
-     color: "#e11d48",           // hex 6 digits
-   };
-   ```
-   puis le `<title>` dans `app/layout.tsx` et le contenu de `app/page.tsx`.
-3. **Configurer l'environnement** — voir [`.env.example`](./.env.example).
-4. **Déclarer l'app au hub** : entrée dans `lib/sources.ts` du repo Hubperso + variable
-   `HUB_TOKEN_<ID>`. ⚠️ C'est du **code** côté hub → redéploiement du hub nécessaire, pas
-   seulement une variable d'environnement.
-5. **Construire l'app.** Quand le moteur produit de vraies données, remplacer
-   `buildingSummary(APP, …)` par un vrai `HubSummary`, validé par `validateSummary(...)`.
-6. **Si l'app a une base** : voir « Migrations » plus bas.
-7. **Créer `HANDOVER.md` et `BACKLOG.md`** dès la première session.
+## Honnêteté des données
 
-## Auth
+C'est le fil conducteur du code, pas un slogan :
 
-Deux authentifications indépendantes, qui ne se recouvrent pas :
+- Un pourcentage n'est affiché que si l'**unité déclarée** permet de l'interpréter. Sans
+  elle, la valeur brute est montrée telle quelle — deviner ferait afficher « 100 % » pour
+  une batterie à 1 %, exactement quand l'information compte le plus.
+- Une **panne** (base injoignable) n'est jamais présentée comme une absence de données. Les
+  deux donnent un écran vide, mais l'une veut dire « le véhicule n'a rien envoyé » et
+  l'autre « CarAI est cassé ».
+- Deux sources qui se contredisent sont affichées **toutes les deux**, avec leur source et
+  leur horodatage. Aucune moyenne : 46 % entre 45 et 47 n'a jamais existé.
+- Le dépassement de bail est chiffré **en kilomètres** tant que le tarif au kilomètre
+  excédentaire n'est pas connu. Un montant plausible mais inventé, sur une décision
+  financière, serait pire que pas de montant.
+- Aucun bloc `usage` n'est publié au hub : CarAI n'a **aucun coût mesuré**, et un `0`
+  affirmerait un suivi qui n'existe pas.
 
-| | Qui | Mécanisme | Échec |
-|---|---|---|---|
-| **Hub → app** | le hub, server-side | header `x-hub-token` | 503 si `HUB_TOKEN` absent, 401 si invalide |
-| **Toi → app** | navigateur | Google OAuth, 1 adresse | 503 si non configurée, redirection `/login` sinon |
-
-```bash
-# jeton du hub
-node -e "console.log(require('crypto').randomBytes(24).toString('base64url'))"
-# secret Auth.js
-npx auth secret
-```
-
-⚠️ **Fail-closed voulu** : sans `AUTH_SECRET`/`AUTHORIZED_EMAIL`, le middleware répond 503 et
-ne sert RIEN. Auth.js seul se contente de logguer `MissingSecret` et **laisse passer** —
-constaté en préproduction sur le hub, qui servait ses données sans login.
-
-## Migrations : rien à lancer sur ton PC
-
-Exigence de Marc, non négociable. Deux patrons éprouvés, au choix :
-
-- **Au déploiement** (BatchChef) : ajouter `"vercel-build": "npm run db:migrate && next build"`.
-  Vercel utilise ce script à la place de `build` quand il existe → les migrations s'appliquent
-  à chaque déploiement, prod et previews. Idempotent (table de suivi Drizzle).
-- **Au démarrage de l'app** (JobAI, `lib/migrations.ts`) : mémorisé par processus, n'échoue
-  jamais vers l'appelant. À préférer si l'app doit aussi se réparer hors déploiement.
-
-## CORS : rien à faire
-
-Le hub fetch `/hub/summary` **server-side**. Aucun header CORS à configurer — si le besoin
-apparaît, c'est le signe qu'un fetch est parti côté client, ce qui exposerait le jeton.
-
-## Développement
+## Démarrer
 
 ```bash
 npm install
-npm run dev        # http://localhost:3000  (endpoint : /hub/summary)
-npm run test       # vitest (contrat + garde d'accès)
-npm run typecheck  # tsc --noEmit
-npm run lint
-npm run build
-
-# tester le endpoint en local
-HUB_TOKEN=dev npm run dev
-curl -s -H "x-hub-token: dev" http://localhost:3000/hub/summary
+cp .env.example .env.local   # puis remplir
+npm run dev
 ```
 
-Avant chaque commit : `npm run typecheck && npm run lint && npm run test && npm run build`.
+Les migrations s'appliquent **au démarrage de l'app** — aucune commande à lancer, jamais.
+`npm run db:generate` ne sert qu'à produire le SQL au moment du développement.
 
-## Déploiement
+Voir **[HANDOVER.md](./HANDOVER.md)** pour la liste ordonnée de ce qu'il reste à configurer
+(Neon, Vercel, Google, Smartcar, webhook, jeton hub).
 
-Vercel (ou tout hôte Next.js). Définir `HUB_TOKEN`, `AUTH_SECRET`, `AUTHORIZED_EMAIL`,
-`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`. Domaine cible : `<nom>.hubperso.com`.
+## Vérifications
 
-Redirect URIs à déclarer côté Google Cloud :
-`http://localhost:3000/api/auth/callback/google` et
-`https://<nom>.hubperso.com/api/auth/callback/google`.
+```bash
+npm run typecheck && npm run lint && npm run test && npm run build
+```
 
-## Version du contrat
+## Serveur MCP
 
-`@mokarade/hub-contract` est épinglé sur un **SHA**, pas un tag : le tag `v1.1.0` n'a jamais
-pu être poussé (proxy git, 403 sur les refs de tag). Les cinq dépôts de l'écosystème épinglent
-le **même** SHA `2d37a61…` = contenu v1.1.0 (bloc `usage` additif). Ne pas redescendre à
-`#v1.0.0`, qui ignore ce bloc.
+```bash
+npm run mcp:dev
+```
+
+Neuf tools : état du véhicule, historique, entretien, suivi du bail, et les commandes
+(verrouillage, charge). Détail dans [`mcp/README.md`](./mcp/README.md).
+
+## Authentification
+
+L'app affiche des données personnelles réelles — position du véhicule comprise. Elle est
+donc derrière un login Google **mono-adresse** (`AUTHORIZED_EMAIL`), avec un middleware
+fail-closed : sans configuration d'auth complète, rien de protégé n'est servi.
+
+Quatre routes échappent au garde de session parce qu'elles sont appelées par des machines
+et portent leur propre authentification : `/hub/summary` (jeton), les deux webhooks
+(signature HMAC et secret partagé) et le cron (secret). Elles sont énumérées une par une
+dans `lib/authGuard.ts` — jamais par préfixe de dossier, pour qu'une route ajoutée demain
+tombe derrière le garde par défaut.

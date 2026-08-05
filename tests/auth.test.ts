@@ -4,9 +4,11 @@
 // défauts que les apps réelles ont dû corriger en production.
 
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { isAuthorizedEmail } from "../lib/authorized";
 import { isAuthConfigured } from "../lib/authConfigured";
-import { decideGuard, isPublicPath } from "../lib/authGuard";
+import { decideGuard, isPublicPath, ROUTES_A_AUTH_PROPRE } from "../lib/authGuard";
 
 describe("isAuthorizedEmail — une seule adresse admise", () => {
   it("accepte l'adresse autorisée, insensible à la casse et aux espaces", () => {
@@ -59,6 +61,43 @@ describe("isPublicPath", () => {
   it("protège les pages de données", () => {
     expect(isPublicPath("/")).toBe(false);
     expect(isPublicPath("/detail/42")).toBe(false);
+  });
+
+  // Les routes appelées par des MACHINES portent leur propre authentification et doivent
+  // échapper au garde de session. Pour Smartcar, l'enjeu est concret : une route qui répond
+  // 302 ou 503 compte comme un échec de livraison, et six échecs consécutifs suffisent à ce
+  // que Smartcar DÉSACTIVE le webhook — le flux de données s'arrêterait sans rien de rouge.
+  it("laisse publiques les routes à authentification propre", () => {
+    for (const route of ROUTES_A_AUTH_PROPRE) {
+      expect(isPublicPath(route), `${route} devrait être publique`).toBe(true);
+    }
+  });
+
+  // ⚠️ Le contre-test : la liste est EXPLICITE, jamais un préfixe de dossier. Une route de
+  // webhook ajoutée demain sans être déclarée doit tomber DERRIÈRE le garde — le mauvais
+  // côté de l'oubli doit être le côté sûr (leçon JobAI : « un garde qui s'exclut d'un
+  // dossier entier s'en exclut pour toujours »).
+  it("ne rend PAS public un webhook non déclaré", () => {
+    expect(isPublicPath("/api/webhooks/inconnu")).toBe(false);
+    expect(isPublicPath("/api/cron/autre-chose")).toBe(false);
+  });
+});
+
+// Deux listes disent la même chose à deux endroits : `ROUTES_A_AUTH_PROPRE` et le matcher
+// du middleware. Next exige un littéral statique dans le matcher, donc la duplication est
+// inévitable — mais elle n'a pas à être silencieuse. Ce test est le seul mécanisme qui
+// empêche une route ajoutée d'un côté d'être oubliée de l'autre.
+describe("alignement matcher ↔ isPublicPath", () => {
+  const middleware = readFileSync(resolve(process.cwd(), "middleware.ts"), "utf8");
+
+  it("chaque route à auth propre est exclue du matcher du middleware", () => {
+    for (const route of ROUTES_A_AUTH_PROPRE) {
+      const sansSlash = route.replace(/^\//, "");
+      expect(
+        middleware.includes(sansSlash),
+        `${route} est dans ROUTES_A_AUTH_PROPRE mais absente du matcher de middleware.ts`,
+      ).toBe(true);
+    }
   });
 });
 

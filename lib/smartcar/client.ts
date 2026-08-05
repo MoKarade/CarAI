@@ -15,6 +15,7 @@ import {
   type CredentialsSmartcar,
 } from "./auth";
 import { parseSmartcarError } from "./errors";
+import type { Env } from "@/lib/env";
 
 export const BASE_VEHICLE = "https://vehicle.api.smartcar.com/v3";
 export const BASE_MANAGEMENT = "https://management.api.smartcar.com/v3";
@@ -55,7 +56,7 @@ export interface ContexteSmartcar {
  */
 export async function contexteSmartcar(
   lireUserId: () => Promise<string | null>,
-  env: NodeJS.ProcessEnv = process.env,
+  env: Env = process.env,
 ): Promise<ContexteSmartcar | null> {
   const credentials = credentialsSmartcar(env);
   if (!credentials) return null;
