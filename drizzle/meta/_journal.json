@@ -8,6 +8,13 @@
       "when": 1785944065348,
       "tag": "0000_blushing_dark_beast",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786026838377,
+      "tag": "0001_burly_shockwave",
+      "breakpoints": true
     }
   ]
 }

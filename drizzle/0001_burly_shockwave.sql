@@ -1,0 +1,2 @@
+ALTER TABLE "vehicle_snapshots" ADD COLUMN "signal_status" text;--> statement-breakpoint
+CREATE INDEX "webhook_deliveries_raw_a_purger" ON "webhook_deliveries" USING btree ("received_at") WHERE raw IS NOT NULL;

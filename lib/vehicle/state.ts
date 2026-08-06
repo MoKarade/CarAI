@@ -169,6 +169,19 @@ export function nomSource(source: string): string {
   return NOMS_SOURCES[source] ?? source;
 }
 
+/**
+ * Âge d'une mesure, en clair. Vit ICI et pas dans une page : deux écrans qui formatent
+ * l'âge chacun dans leur coin finissent par le dire différemment (leçon JobAI sur les
+ * gardes dupliquées — la copie la plus grossière finit par gagner).
+ */
+export function formaterAge(minutes: number): string {
+  if (minutes < 1) return "à l'instant";
+  if (minutes < 60) return `il y a ${Math.round(minutes)} min`;
+  const heures = minutes / 60;
+  if (heures < 24) return `il y a ${Math.round(heures)} h`;
+  return `il y a ${Math.round(heures / 24)} j`;
+}
+
 /** Formate une valeur pour l'affichage, en refusant d'inventer quand l'unité est douteuse. */
 export function formaterValeur(mesure: MesureQualifiee): string {
   if (mesure.valueNumeric !== null) {

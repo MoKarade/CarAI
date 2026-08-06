@@ -2,68 +2,75 @@
 
 > À lire en premier à chaque reprise de session.
 
-**Dernière mise à jour** : 2026-08-05 (soir) · branche `main`
+**Dernière mise à jour** : 2026-08-06 (après-midi) · branche `main`
 
 ## Où en est le projet
 
-**L'app est DÉPLOYÉE et fonctionne** sur `carai.hubperso.com` : login Google, base Neon
-branchée, tableau de bord honnête. Le véhicule est **autorisé chez Smartcar** (Connect
-réussi) et **abonné au webhook**.
+**Les données RÉELLES arrivent.** Le pipeline complet fonctionne en production :
+Connect réussi, webhook vérifié, livraisons `VEHICLE_STATE` signées, ingérées et
+dédupliquées. Dernière livraison observée dans les journaux Vercel : 11 signaux reçus,
+11 enregistrés. Marc a fait le ménage dans la souscription (retrait des signaux
+`VEHICLE_NOT_CAPABLE` et thermiques).
 
-Il reste **UNE** chose avant que les données arrivent : la **vérification du webhook**.
+Le rapport Smartcar du 06/08 fait foi : **15 signaux confirmés `SUCCESS`** sur la bZ
+(liste dans `SIGNAUX_CONFIRMES_BZ`, `lib/smartcar/signals.ts`), 2 bloqués en
+`PERMISSION` (vitesse, VIN), 1 `UPSTREAM` temporaire (`Service.Records`).
 
 ## L'étape exacte où reprendre
 
-1. Vérifier qu'un déploiement de **production** existe pour le dernier commit de `main`
-   (⚠️ le merge du 05/08 au soir n'en avait pas créé — voir « CI verte ≠ en ligne » dans
-   `CLAUDE.md`). Un « Redeploy » rejoue le commit du déploiement EXISTANT, donc l'ancien
-   code : pour forcer, pousser un nouveau commit.
-2. Contrôler que l'endpoint est prêt :
-   ```bash
-   curl -s -o /dev/null -w '%{http_code}\n' -X POST \
-     https://carai.hubperso.com/api/webhooks/smartcar \
-     -H 'Content-Type: application/json' -H 'sc-signature: peu-importe' \
-     --data-binary '{"eventType":"VEHICLE_STATE"}'
-   ```
-   `401` = prêt (le token de management est là, la signature bidon est refusée).
-   `503` = `SMARTCAR_MANAGEMENT_TOKEN` absent ou pas encore déployé.
-3. Dashboard Smartcar → le webhook `carai` → **Verify**. Doit passer maintenant.
-4. Les livraisons commencent. Première donnée visible sous ~30-60 min (fraîcheur Toyota).
+1. **Vérifier la couverture sur du réel** : ouvrir l'onglet **Base de données**
+   (`carai.hubperso.com/donnees`, privé, rafraîchi automatiquement toutes les 30 s) —
+   il compare la base aux 15 signaux confirmés et NOMME les manquants, liste les 200
+   dernières mesures ligne à ligne et le journal des livraisons.
+   Côté session Claude : les journaux Vercel listent désormais les CODES de chaque
+   livraison (`Codes : charge-ischarging, …`), plus seulement les comptes. Une seule
+   livraison ne suffit pas à conclure : Smartcar peut livrer par lots — juger sur
+   quelques heures.
+2. **Décision de Marc en attente** (PR #11 mergée) : tenter de débloquer
+   `Motion.CurrentSpeed` / `VehicleIdentification.VIN` via `SMARTCAR_SCOPES_EXTRA`
+   (option B — exige de trouver le nom exact des scopes dans le dashboard Smartcar,
+   puis un re-Connect), ou s'en passer (option A, recommandée : la vitesse d'une
+   voiture stationnée est 0, le VIN est sur la carte grise).
+3. `[INFRA-07]` toujours ouvert : `HUB_TOKEN` (CarAI) + `HUB_TOKEN_CARAI` (Hubperso)
+   pour que la tuile CarAI apparaisse sur hubperso.com.
 
-## Ce qui a été appris en branchant pour de vrai (05/08)
+## Décisions de stockage (06/08, demande « BD de qualité pour plusieurs années »)
 
-Quatre pièges, tous corrigés, tous documentés dans le code concerné :
+- **Les MESURES sont conservées à vie.** Une ligne par instant de mesure du véhicule
+  (déduplication structurelle) : ~20-60 Mo/an, des années de marge sur le demi-Go Neon.
+- **Le JSON BRUT des livraisons est purgé après 90 jours** (`WEBHOOK_RAW_RETENTION_JOURS`,
+  `0` = tout garder). Il est redondant — chaque signal, connu ou inconnu, est déjà un
+  snapshot, STATUT compris (`signal_status`) — et c'était LUI qui aurait rempli le plan
+  gratuit en 1 à 3 ans. Les lignes de livraison restent (idempotence + détection de
+  silence) ; seul le blob est vidé. Verrouillé par `tests/inventaire.test.ts` (PGlite,
+  vrai schéma), discrimination prouvée par mutation (DELETE au lieu d'UPDATE → test rouge).
+- **Garde anti-perte** (finding HIGH de la revue adversariale pré-merge, 21 agents) : la
+  purge ne touche JAMAIS un raw reçu après la dernière écriture réussie. Si l'enveloppe
+  Smartcar change (livraisons 200, 0 écrit), le raw devient l'unique copie des mesures —
+  sanctuarisé jusqu'à réparation, et `/donnees` alerte « les livraisons arrivent mais
+  rien ne s'écrit » (48 h sans écriture avec livraisons récentes). Les `VEHICLE_ERROR`
+  sont désormais tracés en base, plus seulement dans les logs éphémères.
+- **Sauvegarde externe : rien en place.** Neon gratuit n'a qu'une restauration courte —
+  et le dépôt étant PUBLIC, aucun dump n'y sera jamais poussé. → `[DATA-01]`.
 
-- **Le cron Vercel** : le plan Hobby n'accepte qu'un cron QUOTIDIEN. Le poll Toyota passe
-  par `.github/workflows/toyota-poll.yml` (manuel tant que Toyota est désactivé).
-- **La course migrations/lecture** : la page rendait un 500 au tout premier chargement.
-  Tout passe par `collecter()`, qui séquence et ne lève jamais.
-- **Deux identifiants Smartcar** : le Connect n'utilise pas celui des API Credentials.
-  D'où `SMARTCAR_CONNECT_CLIENT_ID`, séparé avec repli.
-- **L'événement de vérification n'est PAS signé** : exiger une signature avant de répondre
-  au challenge renvoyait 401 et empêchait toute livraison. Le challenge vit sous `data`.
-  Un garde de forme (`challengeBienForme`) empêche l'endpoint de devenir un oracle de
-  signature.
+## Ce qui a été appris en branchant pour de vrai (05-06/08)
 
-⚠️ Leçon transversale : **trois de ces quatre bugs venaient de chemins d'API devinés**,
-la doc Smartcar étant filtrée par la politique réseau des sessions Claude. Quand une
-valeur ne peut pas être vérifiée, la rendre CONFIGURABLE ou l'APPRENDRE de ce qui arrive
-vaut mieux que de deviner — c'est ce qui a réglé le `vehicleId` (appris des livraisons)
-et le `client_id` (variable dédiée).
+- **Trois bugs sur quatre venaient de chemins d'API devinés** (doc Smartcar filtrée
+  côté réseau). Règle : rendre CONFIGURABLE ce qu'on ne peut pas vérifier
+  (`SMARTCAR_CONNECT_CLIENT_ID`, `SMARTCAR_SCOPES_EXTRA`) ou l'APPRENDRE de ce qui
+  arrive (`apprendreVehicleId`).
+- **Le repli par groupe perdait 7 mesures sur 15** (collision avec l'index unique,
+  silencieuse par construction). Retiré du chemin d'écriture ; un code inconnu devient
+  sa propre métrique.
+- **Un journal qui ne trace que les anomalies est indiagnosticable** : chaque livraison
+  logue reçus/écrits ET les codes. « 0 écrit » est normal (rien n'a bougé) ; c'est
+  « 0 reçu » ou un code absent des logs qui parlent.
+- **Les livraisons TEST sont tracées, jamais enregistrées** (une Tesla fictive à
+  78 432 km aurait produit une fausse alerte de bail).
 
 ## Ce qui reste ouvert
 
-- Le mapping des signaux Smartcar est encore **hypothétique** (`lib/smartcar/signals.ts`).
-  La première livraison réelle révélera les vrais codes. Aucun historique ne sera perdu :
-  `signal_code` conserve le code d'origine, une requête SQL suffit à reclasser. → `[SC-01]`
-- Tarif au km excédentaire du bail à renseigner pour chiffrer le dépassement. → `[BAIL-01]`
-- Graphiques, en-têtes de sécurité, serveur MCP sur Cloud Run. → `BACKLOG.md`
-- Module Toyota : désactivé, et conditionné aux deux vérifications du Doc 3 §2.
-
-## Environnement (rappel)
-
-Posé : `DATABASE_URL`, `AUTH_SECRET`, `AUTHORIZED_EMAIL`, `GOOGLE_CLIENT_ID/SECRET`,
-`SMARTCAR_CLIENT_ID/SECRET`, `SMARTCAR_CONNECT_CLIENT_ID`, `SMARTCAR_MANAGEMENT_TOKEN`.
-
-À poser : `HUB_TOKEN` (côté CarAI) **et** `HUB_TOKEN_CARAI` (côté Hubperso, déjà déployé
-avec le code) — pour que la tuile CarAI apparaisse sur `hubperso.com`.
+Voir `BACKLOG.md` — notamment `[SC-05]` (couverture 15/15 à confirmer sur quelques
+heures de livraisons), `[DATA-01]` (sauvegarde externe), `[UI-01]` (graphiques — les
+agrégats par métrique de `lib/vehicle/inventaire.ts` disent déjà quelles séries sont
+assez fournies pour être tracées), `[SEC-01]` (en-têtes de sécurité).

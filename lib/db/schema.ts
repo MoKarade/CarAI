@@ -26,6 +26,7 @@
 // Tout est conservé indéfiniment (Doc 1 §4.2). Aucune purge. Les index portent donc sur
 // les colonnes de date, pour que les requêtes tiennent à mesure que les années s'empilent.
 
+import { sql } from "drizzle-orm";
 import {
   doublePrecision,
   index,
@@ -53,6 +54,7 @@ export const METRIC_TYPES = [
   "battery_soc",
   "battery_range",
   "battery_capacity",
+  "battery_capacity_nominal",
   "charging_status",
   "charge_limit",
   "charge_plugged_in",
@@ -97,6 +99,14 @@ export const vehicleSnapshots = pgTable(
 
     /** Code brut du signal chez la source (ex. `tractionbattery-stateofcharge`). Traçabilité. */
     signalCode: text("signal_code"),
+
+    /**
+     * Statut déclaré par la source pour CE relevé (`SUCCESS`, `UNKNOWN`, …). Sans lui, une
+     * ligne sans valeur est ambiguë pour toujours : « la bZ a répondu sans valeur » et
+     * « la donnée a été refusée » se ressemblent, et le JSON brut qui permettait de trancher
+     * est purgé après sa fenêtre de rétention (revue adversariale du 06/08/2026).
+     */
+    signalStatus: text("signal_status"),
 
     valueNumeric: doublePrecision("value_numeric"),
     valueText: text("value_text"),
@@ -237,7 +247,16 @@ export const webhookDeliveries = pgTable(
     snapshotsWritten: integer("snapshots_written").notNull().default(0),
     raw: jsonb("raw"),
   },
-  (t) => [index("webhook_deliveries_date").on(t.receivedAt)],
+  (t) => [
+    index("webhook_deliveries_date").on(t.receivedAt),
+    // Index PARTIEL pour la purge du raw : sans lui, le balayage `received_at < limite AND
+    // raw IS NOT NULL` re-visiterait à chaque livraison toutes les lignes DÉJÀ purgées —
+    // une borne qui croît avec l'âge de la table, dans le chemin synchrone du webhook où
+    // la latence finit par compter comme un échec de livraison (revue du 06/08/2026).
+    index("webhook_deliveries_raw_a_purger")
+      .on(t.receivedAt)
+      .where(sql`raw IS NOT NULL`),
+  ],
 );
 
 /**

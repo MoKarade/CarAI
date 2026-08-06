@@ -120,3 +120,67 @@ code {
   color: var(--text-soft);
   font-size: 0.8rem;
 }
+
+/* Onglets de navigation entre les écrans. L'onglet courant n'est pas un lien : rien à
+   cliquer, et le lecteur d'écran l'annonce via aria-current. */
+.onglets {
+  display: flex;
+  gap: 0.35rem;
+  margin: 0 0 1.1rem;
+  flex-wrap: wrap;
+}
+.onglets a,
+.onglets span {
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--text-soft);
+  border: 1px solid var(--border);
+}
+.onglets span[aria-current="page"] {
+  color: var(--text);
+  border-color: var(--accent);
+  background: oklch(60% 0.02 265 / 0.08);
+}
+.onglets a:hover {
+  color: var(--text);
+}
+
+/* Page /donnees : l'inventaire est un TABLEAU, il lui faut plus de largeur que la carte
+   du tableau de bord. Le contenu large défile dans son conteneur, jamais la page. */
+.card-large {
+  max-width: 56rem;
+  width: 100%;
+}
+.card h2 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 1.4rem 0 0.5rem;
+}
+.defilement {
+  overflow-x: auto;
+}
+.tableau {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+.tableau th,
+.tableau td {
+  text-align: left;
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.tableau th {
+  color: var(--text-soft);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.tableau .nombre {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

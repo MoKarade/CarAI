@@ -125,4 +125,14 @@ describe("decideGuard", () => {
       type: "next",
     });
   });
+
+  // La page /donnees liste tout ce que la base contient (comptes, dates, codes de
+  // signaux) : elle DOIT rester derrière le garde. Ce test la nomme explicitement pour
+  // qu'une future exclusion du matcher « pour dépanner » fasse tomber quelque chose.
+  it("l'inventaire /donnees est PRIVÉ : non authentifié ⇒ redirection login", () => {
+    expect(decideGuard({ isAuthenticated: false, pathname: "/donnees" })).toEqual({
+      type: "redirect",
+      location: "/login?callbackUrl=%2Fdonnees",
+    });
+  });
 });

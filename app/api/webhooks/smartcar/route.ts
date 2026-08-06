@@ -34,7 +34,8 @@ import {
   reponseChallenge,
   resumerErreursVehicule,
 } from "@/lib/smartcar/webhook";
-import { ingererLivraison } from "@/lib/smartcar/ingest";
+import { ingererLivraison, tracerLivraisonErreur } from "@/lib/smartcar/ingest";
+import { codesDesSignaux, nombreDeSignaux } from "@/lib/smartcar/signals";
 import { assurerMigrations } from "@/lib/migrations";
 import { baseConfiguree } from "@/lib/db";
 
@@ -124,6 +125,19 @@ export async function POST(request: Request): Promise<Response> {
       console.error(`[smartcar] ${ligne}`);
     }
     console.error("[smartcar] VEHICLE_ERROR brut", JSON.stringify(evenement.raw));
+
+    // Trace PERSISTANTE en plus des logs : « quels signaux le véhicule refuse, et depuis
+    // quand » est l'information qui explique un trou dans une série des mois plus tard —
+    // les logs Vercel, eux, seront partis. Jamais bloquant : la réponse reste 200 quoi
+    // qu'il arrive, un souci de base ne doit pas compter comme un échec de livraison.
+    if (baseConfiguree()) {
+      try {
+        await assurerMigrations();
+        await tracerLivraisonErreur({ eventId: evenement.eventId, raw: evenement.raw });
+      } catch (err) {
+        console.error("[smartcar] trace du VEHICLE_ERROR impossible", err);
+      }
+    }
     return Response.json({ ok: true, note: "erreur véhicule journalisée" }, { headers: NO_STORE });
   }
 
@@ -161,10 +175,22 @@ export async function POST(request: Request): Promise<Response> {
     // `ecrits: 0` sur `recus: 11` est le cas NORMAL quand rien n'a bougé depuis la
     // livraison précédente — la déduplication fait son travail. C'est `recus: 0` qui
     // serait anormal.
-    const recus = Array.isArray(evenement.signaux) ? evenement.signaux.length : 0;
+    // Les CODES, pas seulement le compte : « 11 reçus » ne dit pas si les absents sont
+    // ceux qu'on attendait. Les noms de signaux ne portent aucune VALEUR (pas de GPS, pas
+    // de kilométrage) — ils peuvent vivre dans un journal.
+    //
+    // `recus` = compte BRUT via la MÊME coercition que le chemin d'écriture
+    // (`nombreDeSignaux`). Compter `length` seulement sur un tableau affichait « 0 reçu »
+    // — le signal d'alarme par excellence — pour une charge en objet indexé pourtant
+    // écrite normalement, avec un delta « sans code lisible » négatif en prime. Un signal
+    // illisible (sans code) reste visible comme écart POSITIF entre reçus et codes.
+    const recus = nombreDeSignaux(evenement.signaux);
+    const codes = codesDesSignaux(evenement.signaux);
     console.log(
       `[smartcar] livraison ${evenement.eventId ?? "sans-id"} : ${recus} signal(aux) reçu(s), ` +
-        `${ecrits} enregistré(s)${dejaTraite ? " (déjà traitée)" : ""}${ignoree ? " (simulée, ignorée)" : ""}.`,
+        `${ecrits} enregistré(s)${dejaTraite ? " (déjà traitée)" : ""}${ignoree ? " (simulée, ignorée)" : ""}.` +
+        (codes.length > 0 ? ` Codes : ${codes.join(", ")}` : "") +
+        (recus !== codes.length ? ` (${recus - codes.length} sans code lisible)` : ""),
     );
 
     return Response.json(
