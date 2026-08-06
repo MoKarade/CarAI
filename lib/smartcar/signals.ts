@@ -48,31 +48,47 @@ export interface SignalNormalise {
   oemUpdatedAt: Date | null;
   /** Instant où Smartcar a récupéré la donnée chez l'OEM. */
   retrievedAt: Date | null;
+  /** `SUCCESS`, ou le motif pour lequel l'OEM n'a pas fourni la valeur. */
+  statut: string | null;
 }
 
 /**
  * Correspondances EXACTES code → métrique CarAI.
  *
- * ⚠️ Seules les deux premières lignes sont confirmées par une source externe. Les autres
- * sont les hypothèses du Doc 2 §4.2. Une entrée fausse ne casse rien (repli par groupe),
- * elle rend juste le classement moins fin — à corriger dès que la doc Smartcar est lisible.
+ * ── CE QU'UNE LIVRAISON RÉELLE A APPRIS (06/08/2026) ─────────────────────────────────
+ * Le motif est `{groupe}-{nom en minuscules}`, et les booléens sont nommés `is…` :
+ * `closure-islocked` et NON `closure-lockstatus`. Plusieurs hypothèses du Doc 2 §4.2
+ * étaient donc fausses — sans conséquence, le repli par GROUPE les ayant toutes rattrapées.
+ * C'est précisément ce que cette conception à trois niveaux devait absorber.
+ *
+ * Les entrées marquées ✓ viennent d'une livraison observée. Les autres restent des
+ * hypothèses : elles seront confirmées ou corrigées à mesure que les signaux arrivent, et
+ * `signal_code` conserve toujours le code d'origine pour reclasser sans rien perdre.
  */
 export const CORRESPONDANCE_EXACTE: Readonly<Record<string, MetricType>> = {
-  // — Confirmés —
+  // ✓ Observés dans une livraison réelle
   "tractionbattery-stateofcharge": "battery_soc",
   "odometer-traveleddistance": "odometer",
+  "closure-islocked": "lock_status",
+  "connectivitystatus-isonline": "connectivity_online",
+  "connectivitystatus-isasleep": "vehicle_asleep",
+  "connectivitystatus-isdigitalkeypaired": "digital_key_paired",
+  "connectivitysoftware-currentfirmwareversion": "firmware_version",
+  "vehicleidentification-nickname": "vehicle_nickname",
+  "vehicleuseraccount-permissions": "account_permissions",
+  "vehicleuseraccount-role": "account_role",
 
-  // — Hypothèses (Doc 2 §4.2), à revalider —
+  // — Hypothèses (Doc 2 §4.2), à confirmer à l'arrivée —
   "tractionbattery-range": "battery_range",
   "tractionbattery-capacity": "battery_capacity",
   "tractionbattery-nominalcapacity": "battery_capacity",
   "charge-status": "charging_status",
   "charge-chargingstatus": "charging_status",
+  "charge-ischarging": "charging_status",
   "charge-ispluggedin": "charge_plugged_in",
   "charge-chargelimit": "charge_limit",
   "charge-timetocomplete": "charge_time_remaining",
   "location-preciselocation": "location",
-  "closure-lockstatus": "lock_status",
   "closure-doorstatus": "door_status",
   "closure-windowstatus": "window_status",
   "closure-trunkstatus": "trunk_status",
@@ -95,6 +111,10 @@ export const CORRESPONDANCE_GROUPE: Readonly<Record<string, MetricType>> = {
   wheel: "tire_pressure",
   motion: "speed",
   lowvoltagebattery: "low_voltage_battery",
+  connectivitystatus: "connectivity_online",
+  connectivitysoftware: "firmware_version",
+  vehicleidentification: "vehicle_nickname",
+  vehicleuseraccount: "account_role",
 };
 
 /**
@@ -114,13 +134,34 @@ function chaine(valeur: unknown): string | null {
 }
 
 /**
- * Lit une date ISO-8601 en tolérant l'absence. Renvoie `null` plutôt qu'une date bidon :
- * une fraîcheur inventée est pire que pas de fraîcheur du tout — c'est exactement ce que le
- * hub reproche à `generatedAt` quand on le confond avec `dataAsOf`.
+ * Lit un horodatage, qu'il soit une chaîne ISO-8601 ou un NOMBRE.
+ *
+ * ⚠️ Smartcar envoie des timestamps NUMÉRIQUES en millisecondes (`oemUpdatedAt:
+ * 1786018966898`), pas des chaînes ISO — confirmé par une livraison réelle le 06/08/2026.
+ * La première version n'acceptait que des chaînes : tous les horodatages tombaient à
+ * `null`, `recordedAt` retombait sur l'instant de réception, et la déduplication du schéma
+ * — qui repose ENTIÈREMENT sur `recorded_at` — cessait de fonctionner. Chaque livraison
+ * aurait dupliqué une donnée inchangée, et la fraîcheur affichée aurait été fausse.
+ *
+ * Renvoie `null` plutôt qu'une date bidon : une fraîcheur inventée est pire que pas de
+ * fraîcheur du tout.
  */
 export function dateOuNull(valeur: unknown): Date | null {
+  if (typeof valeur === "number" && Number.isFinite(valeur) && valeur > 0) {
+    // Secondes ou millisecondes ? 1e11 SECONDES vaut l'an 5138 : au-delà, c'est forcément
+    // des millisecondes. En dessous de 1e9 (soit avant 2001) on refuse, plutôt que de
+    // dater une mesure de véhicule des années 1970.
+    if (valeur >= 1e11) return new Date(valeur);
+    if (valeur >= 1e9) return new Date(valeur * 1000);
+    return null;
+  }
+
   const texte = chaine(valeur);
   if (!texte) return null;
+
+  // Une chaîne peut aussi porter un timestamp numérique (« 1786018966898 »).
+  if (/^\d{10,16}$/.test(texte)) return dateOuNull(Number(texte));
+
   const d = new Date(texte);
   return Number.isNaN(d.getTime()) ? null : d;
 }
@@ -138,17 +179,34 @@ export function normaliserSignal(brut: SignalBrut): SignalNormalise | null {
   const code = chaine(brut.code);
   if (!code) return null;
 
+  // Forme RÉELLE, confirmée par une livraison du 06/08/2026 : `name`, `group`, `body`,
+  // `status` et `meta` sont à la RACINE du signal, pas sous `attributes`. La lecture par
+  // `attributes` reste en repli — elle ne coûte rien et survivrait à un changement.
   const attrs = objet(brut.attributes) ?? objet(brut.attribute) ?? {};
   const meta = objet(brut.meta) ?? objet(brut.metadata) ?? {};
-  const body = objet(attrs.body) ?? objet(brut.body) ?? {};
+  const body = objet(brut.body) ?? objet(attrs.body) ?? {};
+  const statut = objet(brut.status) ?? {};
 
   const codeMinuscule = code.toLowerCase();
-  const groupe = (chaine(attrs.group) ?? codeMinuscule.split("-")[0] ?? "").toLowerCase();
-  const nom = chaine(attrs.name) ?? codeMinuscule.split("-").slice(1).join("-");
+  const groupe = (
+    chaine(brut.group) ??
+    chaine(attrs.group) ??
+    codeMinuscule.split("-")[0] ??
+    ""
+  ).toLowerCase();
+  const nom =
+    chaine(brut.name) ?? chaine(attrs.name) ?? codeMinuscule.split("-").slice(1).join("-");
 
-  // La valeur peut vivre sous `attributes.body.value`, ou directement sur le signal.
+  // `body.values` au PLURIEL pour les signaux à valeurs multiples (permissions du compte,
+  // par exemple). L'ignorer écrirait une ligne vide là où une liste existe.
   const valeur =
-    "value" in body ? body.value : "value" in brut ? brut.value : (attrs.value ?? null);
+    "value" in body
+      ? body.value
+      : "values" in body
+        ? body.values
+        : "value" in brut
+          ? brut.value
+          : (attrs.value ?? null);
 
   return {
     code: codeMinuscule,
@@ -156,8 +214,11 @@ export function normaliserSignal(brut: SignalBrut): SignalNormalise | null {
     nom,
     valeur,
     unite: chaine(body.unit) ?? chaine(attrs.unit),
-    oemUpdatedAt: dateOuNull(meta.oemUpdatedTime ?? meta.oemUpdatedAt),
-    retrievedAt: dateOuNull(meta.retrievedTime ?? meta.ingestedTime ?? meta.retrievedAt),
+    // `SUCCESS` quand le véhicule a répondu. Autre chose signale une donnée que l'OEM n'a
+    // pas pu fournir cette fois-ci — à distinguer d'une absence pure.
+    statut: chaine(statut.value) ?? chaine(brut.status),
+    oemUpdatedAt: dateOuNull(meta.oemUpdatedAt ?? meta.oemUpdatedTime),
+    retrievedAt: dateOuNull(meta.retrievedAt ?? meta.retrievedTime ?? meta.ingestedTime),
   };
 }
 

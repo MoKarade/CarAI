@@ -140,6 +140,13 @@ export const LIBELLES: Readonly<Record<string, string>> = {
   speed: "Vitesse",
   key_fob_battery: "Pile de la clé",
   low_voltage_battery: "Batterie 12 V",
+  connectivity_online: "Véhicule en ligne",
+  vehicle_asleep: "Véhicule en veille",
+  digital_key_paired: "Clé numérique appairée",
+  firmware_version: "Version du logiciel",
+  vehicle_nickname: "Surnom du véhicule",
+  account_permissions: "Permissions du compte",
+  account_role: "Rôle sur le véhicule",
 };
 
 export function libelle(metricType: string): string {
