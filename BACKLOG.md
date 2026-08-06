@@ -41,8 +41,8 @@ Voir `HANDOVER.md` pour la marche à suivre détaillée.
 - [ ] `[UI-02]` Bouton « rafraîchir maintenant » (le chemin `demandeExplicite` existe déjà
       dans `deciderPoll`, avec son plancher anti-abus)
 - [ ] `[UI-03]` Compléter l'écran de diagnostic : santé Toyota et état de la connexion
-      Smartcar (la partie « livraisons + couverture des signaux » est livrée dans
-      `/donnees` le 06/08)
+      Smartcar (la partie « livraisons + couverture + mesures ligne à ligne, en live »
+      est livrée dans l'onglet Base de données le 06/08)
 - [ ] `[DATA-01]` **Stratégie de sauvegarde externe de la base.** Neon gratuit n'offre
       qu'une restauration courte, et le dépôt est PUBLIC — un dump n'ira jamais sur
       GitHub. Piste : export périodique chiffré (age) vers le Drive de Marc, déclenché

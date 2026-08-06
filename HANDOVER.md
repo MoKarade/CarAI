@@ -18,8 +18,10 @@ Le rapport Smartcar du 06/08 fait foi : **15 signaux confirmés `SUCCESS`** sur 
 
 ## L'étape exacte où reprendre
 
-1. **Vérifier la couverture sur du réel** : ouvrir `carai.hubperso.com/donnees` (page
-   privée) — elle compare la base aux 15 signaux confirmés et NOMME les manquants.
+1. **Vérifier la couverture sur du réel** : ouvrir l'onglet **Base de données**
+   (`carai.hubperso.com/donnees`, privé, rafraîchi automatiquement toutes les 30 s) —
+   il compare la base aux 15 signaux confirmés et NOMME les manquants, liste les 200
+   dernières mesures ligne à ligne et le journal des livraisons.
    Côté session Claude : les journaux Vercel listent désormais les CODES de chaque
    livraison (`Codes : charge-ischarging, …`), plus seulement les comptes. Une seule
    livraison ne suffit pas à conclure : Smartcar peut livrer par lots — juger sur
