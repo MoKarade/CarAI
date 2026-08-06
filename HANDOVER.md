@@ -6,33 +6,34 @@
 
 ## Où en est le projet
 
-**Les données RÉELLES arrivent.** Le pipeline complet fonctionne en production :
-Connect réussi, webhook vérifié, livraisons `VEHICLE_STATE` signées, ingérées et
-dédupliquées. Dernière livraison observée dans les journaux Vercel : 11 signaux reçus,
-11 enregistrés. Marc a fait le ménage dans la souscription (retrait des signaux
-`VEHICLE_NOT_CAPABLE` et thermiques).
+**La souscription ÉLARGIE tourne en production.** L'après-midi du 06/08 a révélé que le
+webhook ne portait que les 11 signaux d'origine (3 utiles + 8 morts) pendant que le
+catalogue en montrait 15 fonctionnels — Marc l'a élargie à **84 signaux** (clim,
+températures, ampérage/tension/puissance de charge, HVAC, diagnostics, transmission,
+batterie 12 V…). Première livraison LIVE élargie à 15:33 UTC : **84 reçus,
+84 enregistrés** ; la suivante 84/80 (déduplication normale). La livraison TEST de
+validation (Tesla fictive) a été tracée sans être enregistrée.
 
-Le rapport Smartcar du 06/08 fait foi : **15 signaux confirmés `SUCCESS`** sur la bZ
-(liste dans `SIGNAUX_CONFIRMES_BZ`, `lib/smartcar/signals.ts`), 2 bloqués en
-`PERMISSION` (vitesse, VIN), 1 `UPSTREAM` temporaire (`Service.Records`).
+L'onglet **Base de données** (`/donnees`) est complet : tableau filtrable
+(métrique/source/période) avec pagination bornée et total, export CSV de l'HISTORIQUE
+COMPLET (`/api/donnees/export` — streaming avec contre-pression, curseur stable,
+formules neutralisées), couverture des signaux confirmés, journal des livraisons,
+rafraîchissement automatique 30 s. Garde d'affichage GPS par CONTENU (revue
+adversariale : un code de position inconnu ne peut pas afficher ses coordonnées).
 
 ## L'étape exacte où reprendre
 
-1. **Vérifier la couverture sur du réel** : ouvrir l'onglet **Base de données**
-   (`carai.hubperso.com/donnees`, privé, rafraîchi automatiquement toutes les 30 s) —
-   il compare la base aux 15 signaux confirmés et NOMME les manquants, liste les 200
-   dernières mesures ligne à ligne et le journal des livraisons.
-   Côté session Claude : les journaux Vercel listent désormais les CODES de chaque
-   livraison (`Codes : charge-ischarging, …`), plus seulement les comptes. Une seule
-   livraison ne suffit pas à conclure : Smartcar peut livrer par lots — juger sur
-   quelques heures.
-2. **Décision de Marc en attente** (PR #11 mergée) : tenter de débloquer
-   `Motion.CurrentSpeed` / `VehicleIdentification.VIN` via `SMARTCAR_SCOPES_EXTRA`
-   (option B — exige de trouver le nom exact des scopes dans le dashboard Smartcar,
-   puis un re-Connect), ou s'en passer (option A, recommandée : la vitesse d'une
-   voiture stationnée est 0, le VIN est sur la carte grise).
+1. **Lire ce que la bZ accepte des 84** : colonne Statut de l'onglet Base de données
+   (`signal_status` en base) — `SUCCESS` vs refus, signal par signal. Les codes
+   confirmés `SUCCESS` sur du LIVE sont candidats à `SIGNAUX_CONFIRMES_BZ`
+   (`lib/smartcar/signals.ts`) : les y ajouter DANS LE MÊME COMMIT que la mise à jour
+   du test (15 → N). Les refus (`VEHICLE_ERROR`) sont tracés en base.
+2. **Décision de Marc en attente** : débloquer `Motion.CurrentSpeed` /
+   `VehicleIdentification.VIN` via `SMARTCAR_SCOPES_EXTRA` + re-Connect (option B), ou
+   s'en passer (option A, recommandée).
 3. `[INFRA-07]` toujours ouvert : `HUB_TOKEN` (CarAI) + `HUB_TOKEN_CARAI` (Hubperso)
    pour que la tuile CarAI apparaisse sur hubperso.com.
+4. `[UI-01]` Graphiques : les séries sont désormais riches (84 signaux aux 20 min).
 
 ## Décisions de stockage (06/08, demande « BD de qualité pour plusieurs années »)
 
