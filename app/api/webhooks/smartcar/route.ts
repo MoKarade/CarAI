@@ -201,7 +201,8 @@ export async function POST(request: Request): Promise<Response> {
     // « lesquels marchent ? », lisible sans requête SQL. Les refus portent leur motif.
     if (statuts.enEchec.length > 0) {
       console.warn(
-        `[smartcar] statuts : ${statuts.succes.length} SUCCESS ; ${statuts.enEchec.length} en échec — ` +
+        `[smartcar] statuts${ignoree ? " (simulée)" : ""} : ${statuts.succes.length} SUCCESS ; ` +
+          `${statuts.enEchec.length} en échec — ` +
           statuts.enEchec.map((e) => `${e.code}(${e.statut})`).join(", "),
       );
     }

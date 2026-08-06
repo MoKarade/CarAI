@@ -9,7 +9,7 @@
 //      SVG pur. Aucune bibliothèque de graphiques, aucun octet de données brutes envoyé au
 //      navigateur au-delà du dessin — cohérent avec « server-side only ».
 
-import { and, asc, gte, isNotNull, sql, eq } from "drizzle-orm";
+import { and, desc, gte, isNotNull, sql, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { vehicleSnapshots } from "@/lib/db/schema";
 
@@ -37,9 +37,12 @@ export interface EtatSignal {
  * prochain rafraîchissement de la page, pas à la prochaine session de code).
  */
 export async function etatDesSignaux(dbx: Dbx = db): Promise<EtatSignal[]> {
+  // DISTINCT ON (source, signal_code) — la SOURCE fait partie de l'identité : si le
+  // futur poll Toyota publiait un code que Smartcar publie aussi, l'un masquerait l'état
+  // de l'autre (revue du 06/08).
   const resultat = await dbx.execute(sql`
     WITH dernieres AS (
-      SELECT DISTINCT ON (signal_code)
+      SELECT DISTINCT ON (source, signal_code)
         signal_code   AS "signalCode",
         metric_type   AS "metricType",
         source,
@@ -49,17 +52,17 @@ export async function etatDesSignaux(dbx: Dbx = db): Promise<EtatSignal[]> {
                       AS "porteValeur"
       FROM vehicle_snapshots
       WHERE signal_code IS NOT NULL
-      ORDER BY signal_code, recorded_at DESC, id DESC
+      ORDER BY source, signal_code, recorded_at DESC, id DESC
     ),
     volumes AS (
-      SELECT signal_code AS "signalCode", COUNT(*)::int AS "nbMesures"
+      SELECT source, signal_code AS "signalCode", COUNT(*)::int AS "nbMesures"
       FROM vehicle_snapshots
       WHERE signal_code IS NOT NULL
-      GROUP BY signal_code
+      GROUP BY source, signal_code
     )
     SELECT d.*, v."nbMesures"
     FROM dernieres d
-    JOIN volumes v ON v."signalCode" = d."signalCode"
+    JOIN volumes v ON v."signalCode" = d."signalCode" AND v.source = d.source
     ORDER BY v."nbMesures" DESC, d."signalCode"
   `);
 
@@ -87,13 +90,14 @@ export type ClasseSignal = "fonctionne" | "refuse" | "sans_valeur";
 
 /**
  * « Marche » = la dernière ligne est un SUCCESS (ou sans statut déclaré) ET porte une
- * valeur. « Refusé » = le dernier statut est un échec déclaré par la source. Le reste —
- * SUCCESS sans valeur — est dit tel quel : la source a répondu sans donnée exploitable,
- * ni un refus ni une mesure.
+ * valeur. « Refusé » = un échec DÉCLARÉ par la source (`ERROR…`). `UNKNOWN` n'est PAS un
+ * refus — c'est « le véhicule gère la donnée mais n'en a pas fourni de valide cette
+ * fois-ci » (Doc 2 §5.3, même sémantique que dans l'ingestion) : il va dans « sans
+ * valeur », dit tel quel.
  */
 export function classerSignal(etat: EtatSignal): ClasseSignal {
   const statut = etat.dernierStatut?.toUpperCase() ?? null;
-  if (statut !== null && statut !== "SUCCESS") return "refuse";
+  if (statut !== null && statut !== "SUCCESS" && statut !== "UNKNOWN") return "refuse";
   return etat.porteValeur ? "fonctionne" : "sans_valeur";
 }
 
@@ -116,12 +120,24 @@ export async function serieNumerique(
 ): Promise<{ points: PointSerie[]; unite: string | null }> {
   const { depuis = null, limite = 4_000, dbx = db } = options;
 
+  // Défense en profondeur : une POSITION ne se trace pas. Les courbes ne lisent que
+  // `value_numeric` (jamais les coordonnées, qui vivent en JSON), mais la liste
+  // SERIES_ANALYSE ne doit pas rester le SEUL rempart (revue du 06/08).
+  if (metricType === "location" || metricType.toLowerCase().startsWith("location")) {
+    return { points: [], unite: null };
+  }
+
   const clauses = [
     eq(vehicleSnapshots.metricType, metricType),
     isNotNull(vehicleSnapshots.valueNumeric),
   ];
   if (depuis) clauses.push(gte(vehicleSnapshots.recordedAt, depuis));
 
+  // Fenêtre ancrée du côté RÉCENT : `LIMIT` en ordre croissant aurait gardé les 4 000
+  // plus VIEUX points — la courbe se serait figée en silence le jour où une série
+  // dépasse la borne, en pleine croissance de la table (finding HIGH de la revue du
+  // 06/08, la leçon DriveAI des bornes de tête sous un autre visage). On requête
+  // décroissant, puis on remet en ordre chronologique en mémoire.
   const lignes = await dbx
     .select({
       recordedAt: vehicleSnapshots.recordedAt,
@@ -130,30 +146,49 @@ export async function serieNumerique(
     })
     .from(vehicleSnapshots)
     .where(and(...clauses))
-    .orderBy(asc(vehicleSnapshots.recordedAt), asc(vehicleSnapshots.id))
+    .orderBy(desc(vehicleSnapshots.recordedAt), desc(vehicleSnapshots.id))
     .limit(limite);
+  lignes.reverse();
 
   return {
     points: lignes.map((l) => ({
       t: l.recordedAt instanceof Date ? l.recordedAt : new Date(l.recordedAt),
       valeur: l.valueNumeric as number,
     })),
-    // L'unité de la série = celle déclarée par la source (première ligne qui en porte une).
-    unite: lignes.find((l) => l.unit)?.unit ?? null,
+    // L'unité affichée = celle de la ligne la plus RÉCENTE qui en porte une.
+    unite: [...lignes].reverse().find((l) => l.unit)?.unit ?? null,
   };
 }
 
 /**
- * Réduit une série à ~`cible` points en gardant TOUJOURS le premier et le dernier.
- * PURE. Un graphique de 600 px n'affiche pas mieux avec 4 000 points qu'avec 300 — mais
- * perdre le DERNIER point mentirait sur la fraîcheur.
+ * Réduit une série à ≤ 2·`cible` points PAR SEAUX, en gardant le MIN et le MAX de chaque
+ * seau — plus le premier et le dernier point. PURE.
+ *
+ * Un stride naïf (un point sur N) perdait les PICS : le min–max affiché en légende (et
+ * dans l'aria-label) était alors calculé sur la série décimée et MENTAIT sur la période
+ * (finding de la revue du 06/08). Garder les extrêmes de chaque seau rend la décimation
+ * incapable d'effacer un pic — la ligne et la légende disent la même chose. Et perdre le
+ * DERNIER point mentirait sur la fraîcheur.
  */
 export function sousEchantillonner(points: PointSerie[], cible = 300): PointSerie[] {
   if (points.length <= cible || cible < 2) return points;
-  const pas = (points.length - 1) / (cible - 1);
-  const sortie: PointSerie[] = [];
-  for (let i = 0; i < cible - 1; i++) {
-    sortie.push(points[Math.round(i * pas)]!);
+
+  const sortie: PointSerie[] = [points[0]!];
+  const taille = (points.length - 2) / (cible - 2);
+  for (let seau = 0; seau < cible - 2; seau++) {
+    const debut = 1 + Math.floor(seau * taille);
+    const fin = Math.min(1 + Math.floor((seau + 1) * taille), points.length - 1);
+    if (debut >= fin) continue;
+    let iMin = debut;
+    let iMax = debut;
+    for (let i = debut; i < fin; i++) {
+      if (points[i]!.valeur < points[iMin]!.valeur) iMin = i;
+      if (points[i]!.valeur > points[iMax]!.valeur) iMax = i;
+    }
+    // Ordre CHRONOLOGIQUE dans le seau, sans doublon quand min = max.
+    for (const i of iMin === iMax ? [iMin] : [Math.min(iMin, iMax), Math.max(iMin, iMax)]) {
+      sortie.push(points[i]!);
+    }
   }
   sortie.push(points[points.length - 1]!);
   return sortie;
@@ -198,13 +233,21 @@ export function traceSvg(
   const t1 = points[points.length - 1]!.t.getTime();
   const dureeMs = Math.max(1, t1 - t0);
 
-  const polyline = points
+  let polyline = points
     .map((p) => {
       const x = ((p.t.getTime() - t0) / dureeMs) * largeur;
       const y = hauteur - ((p.valeur - min) / (max - min)) * hauteur;
       return `${Math.round(x * 10) / 10},${Math.round(y * 10) / 10}`;
     })
     .join(" ");
+
+  // Un point UNIQUE ne dessine rien (une polyline exige deux sommets) : on tire une
+  // ligne plate sur toute la largeur — « la valeur n'a pas bougé sur la période » — au
+  // lieu d'un cadre vide qui a l'air cassé (revue du 06/08).
+  if (points.length === 1) {
+    const y = polyline.split(",")[1]!;
+    polyline = `0,${y} ${largeur},${y}`;
+  }
 
   return {
     polyline,

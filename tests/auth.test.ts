@@ -143,4 +143,11 @@ describe("decideGuard", () => {
       decideGuard({ isAuthenticated: false, pathname: "/api/donnees/export" }),
     ).toEqual({ type: "unauthorized" });
   });
+
+  it("l'onglet /analyse est PRIVÉ : non authentifié ⇒ redirection login", () => {
+    expect(decideGuard({ isAuthenticated: false, pathname: "/analyse" })).toEqual({
+      type: "redirect",
+      location: "/login?callbackUrl=%2Fanalyse",
+    });
+  });
 });

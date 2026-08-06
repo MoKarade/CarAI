@@ -128,6 +128,12 @@ export const vehicleSnapshots = pgTable(
     ),
     // Série temporelle d'une métrique : le tracé d'un graphique, la requête la plus fréquente.
     index("vehicle_snapshots_metric_date").on(t.metricType, t.recordedAt),
+    // L'état des signaux (/analyse, rafraîchi aux 30 s) fait un DISTINCT ON
+    // (source, signal_code) trié par date : sans cet index, il balaierait la table
+    // entière — qui est conçue pour croître des années (revue du 06/08).
+    index("vehicle_snapshots_signal_date")
+      .on(t.source, t.signalCode, t.recordedAt)
+      .where(sql`signal_code IS NOT NULL`),
     // Balayage chronologique toutes métriques confondues (tableau de bord, dernier état).
     index("vehicle_snapshots_date").on(t.recordedAt),
   ],

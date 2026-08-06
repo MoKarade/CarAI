@@ -297,7 +297,13 @@ export function normaliserSignal(brut: SignalBrut): SignalNormalise | null {
   const nom =
     chaine(brut.name) ?? chaine(attrs.name) ?? codeMinuscule.split("-").slice(1).join("-");
 
-  const statutTexte = chaine(statut.value) ?? chaine(brut.status);
+  // Le statut porte son MOTIF quand la source le donne : `ERROR (COMPATIBILITY)` dit
+  // « la bZ ne sait pas faire » (à retirer de la souscription), `ERROR (PERMISSION)` dit
+  // « débloquable par re-Connect ». Un `ERROR` nu ne permettait pas ce tri (revue 06/08).
+  const valeurStatut = chaine(statut.value) ?? chaine(brut.status);
+  const typeErreur = chaine(objet(statut.error)?.type);
+  const statutTexte =
+    valeurStatut === "ERROR" && typeErreur ? `ERROR (${typeErreur})` : valeurStatut;
   const corpsSansUnite = Object.fromEntries(
     Object.entries(body).filter(([cle]) => cle !== "unit"),
   );

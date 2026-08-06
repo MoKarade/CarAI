@@ -421,6 +421,20 @@ describe("signalVersSnapshot — le STATUT fait partie de la mesure", () => {
     const ligne = signalVersSnapshot(normalise!, { source: "smartcar", recuLe: RECU_LE });
     expect(ligne.signalStatus).toBeNull();
   });
+
+  it("un ERROR porte son MOTIF : COMPATIBILITY (à retirer) ≠ PERMISSION (re-Connect)", () => {
+    const refus = normaliserSignal({
+      code: "closure-sunroof",
+      status: {
+        value: "ERROR",
+        error: { type: "COMPATIBILITY", code: "VEHICLE_NOT_CAPABLE" },
+      },
+    });
+    expect(refus!.statut).toBe("ERROR (COMPATIBILITY)");
+    // Sans objet d'erreur, le statut reste tel quel.
+    const nu = normaliserSignal({ code: "closure-sunroof", status: { value: "ERROR" } });
+    expect(nu!.statut).toBe("ERROR");
+  });
 });
 
 describe("codesDesSignaux — le journal dit LESQUELS, pas seulement combien", () => {

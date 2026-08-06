@@ -71,6 +71,24 @@ describe("etatDesSignaux — le DERNIER statut fait foi", () => {
     expect(classerSignal({ ...etat, dernierStatut: null, porteValeur: true })).toBe(
       "fonctionne",
     );
+    // UNKNOWN n'est PAS un refus : « le véhicule gère la donnée mais n'en a pas fourni
+    // de valide cette fois-ci » (Doc 2 §5.3) — même sémantique que dans l'ingestion.
+    expect(classerSignal({ ...etat, dernierStatut: "UNKNOWN" })).toBe("sans_valeur");
+    // Un ERROR enrichi de son motif reste un refus.
+    expect(classerSignal({ ...etat, dernierStatut: "ERROR (COMPATIBILITY)" })).toBe("refuse");
+  });
+
+  it("deux SOURCES portant le même code sont deux états distincts", async () => {
+    await dbTest.execute(sql`DELETE FROM vehicle_snapshots`);
+    await dbTest.insert(vehicleSnapshots).values([
+      { recordedAt: T(10), source: "smartcar", metricType: "battery_soc", signalCode: "code-partage", signalStatus: "SUCCESS", valueNumeric: 75 },
+      { recordedAt: T(12), source: "toyota_na", metricType: "battery_soc", signalCode: "code-partage", signalStatus: "ERROR", valueNumeric: null },
+    ]);
+    const etats = await etatDesSignaux(dbx);
+    const parSource = etats.filter((e) => e.signalCode === "code-partage");
+    // Sans la source dans le DISTINCT, l'état toyota (plus récent) aurait MASQUÉ le
+    // smartcar fonctionnel.
+    expect(parSource).toHaveLength(2);
   });
 });
 
@@ -90,18 +108,64 @@ describe("serieNumerique — du plus ancien au plus récent, avec son unité", (
     const fenetre = await serieNumerique("battery_soc", { depuis: T(11), dbx });
     expect(fenetre.points.map((p) => p.valeur)).toEqual([74]);
   });
+
+  it("la LIMITE garde le côté RÉCENT — une courbe ne se fige jamais sur le passé", async () => {
+    // `LIMIT` en ordre croissant aurait gardé les plus VIEUX points : la courbe se
+    // serait figée en silence dès qu'une série dépasse la borne (finding HIGH de la
+    // revue du 06/08 — la leçon DriveAI des bornes de tête, sous un autre visage).
+    await dbTest.insert(vehicleSnapshots).values(
+      [10, 11, 12, 13, 14].map((h) => ({
+        recordedAt: T(h),
+        source: "smartcar" as const,
+        metricType: "battery_soc",
+        valueNumeric: h,
+      })),
+    );
+
+    const { points } = await serieNumerique("battery_soc", { limite: 3, dbx });
+    // Les 3 plus RÉCENTS, remis en ordre chronologique.
+    expect(points.map((p) => p.valeur)).toEqual([12, 13, 14]);
+  });
+
+  it("une POSITION ne se trace pas, même appelée directement", async () => {
+    await dbTest.insert(vehicleSnapshots).values([
+      { recordedAt: T(10), source: "smartcar", metricType: "location", valueNumeric: 46.1 },
+    ]);
+    const { points } = await serieNumerique("location", { dbx });
+    expect(points).toEqual([]);
+    const inconnue = await serieNumerique("location-approximatelocation", { dbx });
+    expect(inconnue.points).toEqual([]);
+  });
 });
 
 describe("sousEchantillonner — jamais perdre le premier ni le DERNIER point", () => {
   const serie = (n: number): PointSerie[] =>
     Array.from({ length: n }, (_, i) => ({ t: new Date(i * 1000), valeur: i }));
 
-  it("réduit à la cible en gardant les extrémités", () => {
+  it("réduit en gardant les extrémités", () => {
     const reduit = sousEchantillonner(serie(4000), 300);
-    expect(reduit).toHaveLength(300);
+    expect(reduit.length).toBeLessThanOrEqual(600);
+    expect(reduit.length).toBeGreaterThanOrEqual(300);
     expect(reduit[0]!.valeur).toBe(0);
     // Perdre le dernier point mentirait sur la FRAÎCHEUR de la série.
     expect(reduit[reduit.length - 1]!.valeur).toBe(3999);
+    // Et l'ordre chronologique survit à la décimation par seaux.
+    for (let i = 1; i < reduit.length; i++) {
+      expect(reduit[i]!.t.getTime()).toBeGreaterThanOrEqual(reduit[i - 1]!.t.getTime());
+    }
+  });
+
+  it("un PIC survit à la décimation — la légende ne peut pas mentir", () => {
+    // Un stride naïf (un point sur N) effaçait un pic tombé entre deux pas, et le
+    // min–max affiché était alors calculé sur la série décimée (revue du 06/08).
+    const points = serie(4000);
+    points[1777] = { t: points[1777]!.t, valeur: 99_999 };
+    points[2333] = { t: points[2333]!.t, valeur: -99_999 };
+
+    const reduit = sousEchantillonner(points, 300);
+    const valeurs = reduit.map((p) => p.valeur);
+    expect(Math.max(...valeurs)).toBe(99_999);
+    expect(Math.min(...valeurs)).toBe(-99_999);
   });
 
   it("ne touche pas une série déjà courte", () => {
