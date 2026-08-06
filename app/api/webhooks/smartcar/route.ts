@@ -32,6 +32,7 @@ import {
   lireEvenement,
   livraisonAuthentique,
   reponseChallenge,
+  resumerErreursVehicule,
 } from "@/lib/smartcar/webhook";
 import { ingererLivraison } from "@/lib/smartcar/ingest";
 import { assurerMigrations } from "@/lib/migrations";
@@ -117,7 +118,12 @@ export async function POST(request: Request): Promise<Response> {
   // Un VEHICLE_ERROR se journalise et ne casse pas le pipeline (Doc 2 §6.3). On répond 200 :
   // la livraison a bien été reçue, c'est l'OEM qui a un problème, pas nous.
   if (evenement.type === "VEHICLE_ERROR") {
-    console.error("[smartcar] VEHICLE_ERROR reçu", JSON.stringify(evenement.raw));
+    // Résumé LISIBLE d'abord : un VEHICLE_ERROR dit quels signaux le véhicule refuse, et
+    // donc quoi retirer de la souscription. Le JSON brut suit — lui seul contient tout.
+    for (const ligne of resumerErreursVehicule(evenement.raw)) {
+      console.error(`[smartcar] ${ligne}`);
+    }
+    console.error("[smartcar] VEHICLE_ERROR brut", JSON.stringify(evenement.raw));
     return Response.json({ ok: true, note: "erreur véhicule journalisée" }, { headers: NO_STORE });
   }
 
@@ -147,9 +153,24 @@ export async function POST(request: Request): Promise<Response> {
       simulee: estSimulee(evenement),
     });
 
-    // `ecrits: 0` n'est PAS une anomalie : c'est le cas normal quand aucun signal n'a bougé
-    // depuis la dernière livraison (la déduplication fait son travail).
-    return Response.json({ ok: true, ecrits, dejaTraite, ignoree }, { headers: NO_STORE });
+    // ── JOURNALISER CHAQUE LIVRAISON, PAS SEULEMENT LES ANOMALIES ──────────────────
+    // Sans cette ligne, « tout va bien » et « rien n'arrive » laissent la MÊME trace :
+    // aucune. Impossible alors de répondre à « est-ce qu'on reçoit bien tout ? » autrement
+    // qu'en devinant (leçon JobAI : « 0/0 » et « 0/11 » disent des choses opposées).
+    //
+    // `ecrits: 0` sur `recus: 11` est le cas NORMAL quand rien n'a bougé depuis la
+    // livraison précédente — la déduplication fait son travail. C'est `recus: 0` qui
+    // serait anormal.
+    const recus = Array.isArray(evenement.signaux) ? evenement.signaux.length : 0;
+    console.log(
+      `[smartcar] livraison ${evenement.eventId ?? "sans-id"} : ${recus} signal(aux) reçu(s), ` +
+        `${ecrits} enregistré(s)${dejaTraite ? " (déjà traitée)" : ""}${ignoree ? " (simulée, ignorée)" : ""}.`,
+    );
+
+    return Response.json(
+      { ok: true, recus, ecrits, dejaTraite, ignoree },
+      { headers: NO_STORE },
+    );
   } catch (err) {
     console.error("[smartcar] ingestion impossible", err);
     // 500 assumé : Smartcar RETENTERA, et la déduplication rend le rejeu sans risque. C'est

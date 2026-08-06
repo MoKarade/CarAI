@@ -9,7 +9,7 @@
 // tout écart futur de notre lecture le fera tomber.
 
 import { describe, expect, it } from "vitest";
-import { estSimulee, lireEvenement } from "@/lib/smartcar/webhook";
+import { estSimulee, lireEvenement, resumerErreursVehicule } from "@/lib/smartcar/webhook";
 import { normaliserSignal, signauxVersSnapshots } from "@/lib/smartcar/signals";
 
 /** Livraison VEHICLE_STATE réellement reçue le 06/08/2026 (mode TEST côté Smartcar). */
@@ -172,5 +172,79 @@ describe("conversion en snapshots", () => {
     const soc = lignes.find((l) => l.signalCode === "tractionbattery-stateofcharge")!;
     expect(soc.unit).toBe("percent");
     expect(soc.valueNumeric).toBe(78);
+  });
+});
+
+// ── VEHICLE_ERROR : l'information la plus actionnable du pipeline ───────────────────
+// Reçu en LIVE le 06/08/2026 sur la vraie bZ : huit des onze signaux souscrits refusés.
+// Cette information dit exactement quoi retirer de la souscription — encore faut-il
+// qu'elle soit lisible, et non noyée dans trente lignes de JSON.
+const ERREUR_REELLE = {
+  eventId: "036121c7-db5c-429d-914d-cf66ea77d3cd",
+  eventType: "VEHICLE_ERROR",
+  data: {
+    vehicle: {
+      id: "c6909d83-4dfc-4b25-85f7-ea060c00fe9d",
+      make: "TOYOTA",
+      model: "bZ XLE AWD",
+      year: 2026,
+      mode: "live",
+      powertrainType: "BEV",
+    },
+    errors: [
+      {
+        type: "COMPATIBILITY",
+        code: "VEHICLE_NOT_CAPABLE",
+        resolution: { type: null },
+        signals: [
+          { code: "connectivitysoftware-currentfirmwareversion" },
+          { code: "connectivitystatus-isasleep" },
+          { code: "connectivitystatus-isdigitalkeypaired" },
+          { code: "connectivitystatus-isonline" },
+          { code: "vehicleidentification-nickname" },
+          { code: "vehicleuseraccount-permissions" },
+          { code: "vehicleuseraccount-role" },
+        ],
+      },
+      {
+        type: "PERMISSION",
+        code: null,
+        resolution: { type: "REAUTHENTICATE" },
+        signals: [{ code: "internalcombustionengine-fuellevel" }],
+      },
+    ],
+  },
+  meta: { mode: "LIVE", deliveryId: "b670fe35", webhookName: "carai", version: "4.0" },
+};
+
+describe("resumerErreursVehicule", () => {
+  const lignes = resumerErreursVehicule(ERREUR_REELLE);
+
+  it("produit une ligne par famille d'erreur", () => {
+    expect(lignes).toHaveLength(2);
+  });
+
+  it("nomme les signaux refusés — c'est ce qui dit quoi retirer", () => {
+    expect(lignes[0]).toContain("7 signal(aux)");
+    expect(lignes[0]).toContain("connectivitystatus-isonline");
+  });
+
+  it("distingue les deux causes, qui appellent des gestes OPPOSÉS", () => {
+    // COMPATIBILITY : réessayer est vain, il faut retirer le signal.
+    expect(lignes[0]).toContain("NE SAIT PAS");
+    // PERMISSION : refaire le Connect peut régler le cas.
+    expect(lignes[1]).toContain("Connect");
+  });
+
+  it("ne lève pas sur une charge vide ou inattendue", () => {
+    expect(resumerErreursVehicule(null)).toHaveLength(1);
+    expect(resumerErreursVehicule({ data: {} })).toHaveLength(1);
+  });
+
+  it("l'événement est bien classé VEHICLE_ERROR et reconnu comme LIVE", () => {
+    const ev = lireEvenement(ERREUR_REELLE);
+    expect(ev.type).toBe("VEHICLE_ERROR");
+    expect(estSimulee(ev)).toBe(false);
+    expect(ev.vehicleId).toBe("c6909d83-4dfc-4b25-85f7-ea060c00fe9d");
   });
 });

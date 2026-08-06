@@ -147,6 +147,11 @@ export const LIBELLES: Readonly<Record<string, string>> = {
   vehicle_nickname: "Surnom du véhicule",
   account_permissions: "Permissions du compte",
   account_role: "Rôle sur le véhicule",
+  charging_status_detail: "Détail de la charge",
+  charge_timers: "Minuteries de charge",
+  frunk_status: "Coffre avant",
+  sunroof_status: "Toit ouvrant",
+  vin: "NIV (numéro de série)",
 };
 
 export function libelle(metricType: string): string {
