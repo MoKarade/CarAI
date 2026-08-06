@@ -18,7 +18,6 @@ import { sql } from "drizzle-orm";
 import { vehicleSnapshots, webhookDeliveries } from "@/lib/db/schema";
 import {
   bilanCouverture,
-  dernieresMesures,
   inventaireMesures,
   journalLivraisons,
   type LigneInventaire,
@@ -138,28 +137,6 @@ describe("bilanCouverture — les absences sont NOMMÉES", () => {
     const bilan = bilanCouverture(SIGNAUX_CONFIRMES_BZ.map((c) => ligne(c)));
     expect(bilan.manquants).toEqual([]);
     expect(bilan.recus).toHaveLength(SIGNAUX_CONFIRMES_BZ.length);
-  });
-});
-
-describe("dernieresMesures — la fenêtre récente de « toutes les données »", () => {
-  it("plus récentes d'abord, bornée, sans jamais sortir le contenu d'un JSON", async () => {
-    await dbTest.insert(vehicleSnapshots).values([
-      { recordedAt: T0, source: "smartcar", metricType: "odometer", signalCode: "odometer-traveleddistance", valueNumeric: 100, unit: "km" },
-      { recordedAt: T1, source: "smartcar", metricType: "location", signalCode: "location-preciselocation", valueJson: { latitude: 46.8, longitude: -71.2 } },
-      { recordedAt: T2, source: "smartcar", metricType: "battery_soc", signalCode: "tractionbattery-stateofcharge", valueNumeric: 78, unit: "percent", signalStatus: "SUCCESS" },
-    ]);
-
-    const mesures = await dernieresMesures(2, dbx);
-    expect(mesures.map((m) => m.metricType)).toEqual(["battery_soc", "location"]);
-    expect(mesures[0]!.signalStatus).toBe("SUCCESS");
-
-    // Le GPS ne sort de la requête que comme PRÉSENCE, jamais comme contenu : la page
-    // promet « détail en base, jamais en coordonnées », et cette forme la rend incapable
-    // de trahir cette promesse même par accident.
-    const position = mesures.find((m) => m.metricType === "location")!;
-    expect(position.aDetailJson).toBe(true);
-    expect(JSON.stringify(position)).not.toContain("latitude");
-    expect(JSON.stringify(position)).not.toContain("46.8");
   });
 });
 

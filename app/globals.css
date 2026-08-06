@@ -184,3 +184,33 @@ code {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+
+/* Barre de filtres du tableau : un formulaire GET — lisible, partageable, sans JS. */
+.filtres {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 1rem;
+  margin: 0.4rem 0 0.9rem;
+  font-size: 0.88rem;
+}
+.filtres label {
+  color: var(--text-soft);
+  font-weight: 600;
+}
+.filtres select,
+.filtres button {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.3rem 0.55rem;
+}
+.filtres button {
+  cursor: pointer;
+  font-weight: 600;
+}
+.filtres a {
+  font-weight: 600;
+}

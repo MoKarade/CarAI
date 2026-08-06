@@ -87,6 +87,10 @@ Voir `HANDOVER.md` pour la marche à suivre détaillée.
 - [x] `[DATA-02]` Inventaire des données (`/donnees` : couverture des 15 signaux,
       comptes/bornes par métrique, journal des livraisons) + codes des signaux dans les
       journaux + rétention du raw des webhooks (90 j, mesures conservées à vie) — 2026-08-06
+- [x] `[DATA-03]` Onglet Base de données : tableau filtrable (métrique/source/période),
+      pagination avec total, export CSV COMPLET (`/api/donnees/export`, curseur stable,
+      neutralisation des formules) ; lecture des corps sans `value` (enginecover) et du
+      `locationType` de la position — 2026-08-06
 - [x] `[FOND-01]` Fork d'app-template, schéma de données, migrations au démarrage — 2026-08-05
 - [x] `[FOND-02]` Intégration Smartcar V3 (auth, signaux, webhooks, commandes) — 2026-08-05
 - [x] `[FOND-03]` Module Toyota isolé (OTP, poll, santé) hors adaptateur réseau — 2026-08-05

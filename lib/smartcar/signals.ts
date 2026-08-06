@@ -251,14 +251,24 @@ export function normaliserSignal(brut: SignalBrut): SignalNormalise | null {
 
   // `body.values` au PLURIEL pour les signaux à valeurs multiples (permissions du compte,
   // par exemple). L'ignorer écrirait une ligne vide là où une liste existe.
+  //
+  // Et à défaut des DEUX : le corps ENTIER, s'il porte autre chose que l'unité. Vu sur le
+  // catalogue réel du 06/08/2026 : `closure-enginecover` répond `body: { isOpen: false }`
+  // — ni `value` ni `values`. La première version écrivait « non communiqué » pour un
+  // capot dont l'état était là, sous nos yeux.
+  const corpsSansUnite = Object.fromEntries(
+    Object.entries(body).filter(([cle]) => cle !== "unit"),
+  );
   const valeur =
     "value" in body
       ? body.value
       : "values" in body
         ? body.values
-        : "value" in brut
-          ? brut.value
-          : (attrs.value ?? null);
+        : Object.keys(corpsSansUnite).length > 0
+          ? corpsSansUnite
+          : "value" in brut
+            ? brut.value
+            : (attrs.value ?? null);
 
   return {
     code: codeMinuscule,
@@ -337,6 +347,19 @@ export function signalVersSnapshot(
   const metricType = metriquePourSignal(signal.code, signal.groupe);
   const recordedAt = signal.oemUpdatedAt ?? signal.retrievedAt ?? options.recuLe;
 
+  // La position porte SON type dans son corps (`locationType: "LAST_PARKED"` — catalogue
+  // réel du 06/08/2026). « Où est la voiture » et « où elle s'est GARÉE il y a 19 h »
+  // ne sont pas la même information : sans cette distinction, l'écran laisserait croire
+  // à une position temps réel (Doc 3 §3).
+  const corps = objet(signal.valeur);
+  const typePosition = chaine(corps?.locationType)?.toUpperCase();
+  const locationType: LocationType | null =
+    typePosition === "LAST_PARKED"
+      ? "last_parked"
+      : typePosition === "REAL_TIME"
+        ? "real_time"
+        : (options.locationType ?? null);
+
   const base: NouveauSnapshot = {
     recordedAt,
     receivedAt: options.recuLe,
@@ -351,7 +374,7 @@ export function signalVersSnapshot(
     valueNumeric: null,
     valueText: null,
     valueJson: null,
-    locationType: options.locationType ?? null,
+    locationType,
   };
 
   if (estNombreFini(signal.valeur)) {

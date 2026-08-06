@@ -248,6 +248,64 @@ describe("SIGNAUX_CONFIRMES_BZ — la liste de référence de la couverture", ()
   });
 });
 
+describe("formes RÉELLES du catalogue de signaux (06/08/2026, bZ live)", () => {
+  it("un corps SANS value/values est stocké en entier — closure-enginecover: { isOpen }", () => {
+    // Vu sur le vrai véhicule : le capot avant répond `body: { isOpen: false }`, ni
+    // `value` ni `values`. La première version écrivait « non communiqué » pour un état
+    // qui était là, sous nos yeux.
+    const normalise = normaliserSignal({
+      code: "closure-enginecover",
+      name: "EngineCover",
+      group: "Closure",
+      body: { isOpen: false },
+      status: { value: "SUCCESS" },
+    });
+    const ligne = signalVersSnapshot(normalise!, { source: "smartcar", recuLe: RECU_LE });
+    expect(ligne.metricType).toBe("frunk_status");
+    expect(ligne.valueJson).toEqual({ isOpen: false });
+  });
+
+  it("la position embarque son TYPE : LAST_PARKED n'est pas du temps réel", () => {
+    const normalise = normaliserSignal({
+      code: "location-preciselocation",
+      name: "PreciseLocation",
+      group: "Location",
+      body: {
+        latitude: 46.157352,
+        longitude: -71.88961,
+        heading: null,
+        direction: null,
+        locationType: "LAST_PARKED",
+      },
+      status: { value: "SUCCESS" },
+    });
+    const ligne = signalVersSnapshot(normalise!, { source: "smartcar", recuLe: RECU_LE });
+    expect(ligne.locationType).toBe("last_parked");
+    expect(ligne.valueJson).toMatchObject({ latitude: 46.157352 });
+  });
+
+  it("REAL_TIME est reconnu aussi, et un corps à `value` garde le chemin nominal", () => {
+    const tempsReel = normaliserSignal({
+      code: "location-preciselocation",
+      body: { latitude: 1, longitude: 2, locationType: "REAL_TIME" },
+    });
+    expect(
+      signalVersSnapshot(tempsReel!, { source: "smartcar", recuLe: RECU_LE }).locationType,
+    ).toBe("real_time");
+
+    // Non-régression : `body: { value, unit }` ne doit PAS tomber dans le repli corps
+    // entier — l'autonomie réelle porte aussi type/additionalValues à côté de value.
+    const autonomie = normaliserSignal({
+      code: "tractionbattery-range",
+      body: { value: 293.8, type: "DEFAULT", additionalValues: [], unit: "km" },
+    });
+    const ligne = signalVersSnapshot(autonomie!, { source: "smartcar", recuLe: RECU_LE });
+    expect(ligne.valueNumeric).toBe(293.8);
+    expect(ligne.unit).toBe("km");
+    expect(ligne.valueJson).toBeNull();
+  });
+});
+
 describe("aucun couple de codes vers la même métrique (collision d'index unique)", () => {
   it("chaque métrique de CORRESPONDANCE_EXACTE n'a qu'UN code", () => {
     // Deux codes partageant une métrique ET un horodatage : le second est écarté par

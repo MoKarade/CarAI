@@ -135,4 +135,12 @@ describe("decideGuard", () => {
       location: "/login?callbackUrl=%2Fdonnees",
     });
   });
+
+  // L'export CSV livre l'HISTORIQUE COMPLET, coordonnées GPS incluses : c'est la route la
+  // plus sensible de l'app. Nommée ici pour la même raison que /donnees.
+  it("l'export CSV /api/donnees/export est PRIVÉ : non authentifié ⇒ 401", () => {
+    expect(
+      decideGuard({ isAuthenticated: false, pathname: "/api/donnees/export" }),
+    ).toEqual({ type: "unauthorized" });
+  });
 });
