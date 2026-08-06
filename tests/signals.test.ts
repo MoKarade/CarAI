@@ -60,11 +60,40 @@ describe("metriquePourSignal — trois niveaux, aucune donnée jetée", () => {
     );
   });
 
-  it("repli par GROUPE quand le nom du signal est inconnu", () => {
-    // Le cas qui compte : la table de correspondance a été bâtie sans pouvoir lire la doc.
-    // Un nom mal deviné doit rester correctement classé grâce au groupe.
-    expect(metriquePourSignal("closure-doorlockstate", "closure")).toBe("lock_status");
-    expect(metriquePourSignal("wheel-tirepressurefrontleft", "wheel")).toBe("tire_pressure");
+  // ⚠️ REFORMULÉ le 06/08/2026. Ce test vérifiait que le repli par GROUPE rattrapait un
+  // nom de signal inconnu. Ce repli a dû être RETIRÉ du chemin d'écriture : la bZ publie
+  // six signaux `Charge` et quatre `Closure` au même horodatage, et les ranger sous une
+  // métrique commune les faisait entrer en collision avec l'index unique — sept mesures
+  // sur quinze disparaissaient sans bruit.
+  //
+  // L'invariant PROTÉGÉ n'était pas « le groupe classe », c'était « aucune donnée n'est
+  // perdue ». Il est désormais garanti plus fortement : par l'UNICITÉ.
+  it("deux codes DISTINCTS ne partagent jamais la même métrique", () => {
+    const codes = [
+      "charge-ischarging",
+      "charge-detailedchargingstatus",
+      "charge-ischargingcableconnected",
+      "charge-ischargingportflapopen",
+      "charge-timetocomplete",
+      "charge-chargetimers",
+      "closure-islocked",
+      "closure-doors",
+      "closure-windows",
+      "closure-enginecover",
+    ];
+    const metriques = codes.map((c) => metriquePourSignal(c, c.split("-")[0]!));
+    expect(new Set(metriques).size).toBe(codes.length);
+  });
+
+  it("un code inconnu devient sa propre métrique — unique, donc jamais écrasé", () => {
+    expect(metriquePourSignal("closure-doorlockstate", "closure")).toBe("closure-doorlockstate");
+    expect(metriquePourSignal("wheel-tirepressurefrontleft", "wheel")).toBe(
+      "wheel-tirepressurefrontleft",
+    );
+    // Et deux inconnus du même groupe restent distincts l'un de l'autre.
+    expect(metriquePourSignal("closure-a", "closure")).not.toBe(
+      metriquePourSignal("closure-b", "closure"),
+    );
   });
 
   it("conserve le code brut quand même le groupe est inconnu", () => {
@@ -105,8 +134,9 @@ describe("signalVersSnapshot — recordedAt et typage des valeurs", () => {
 
   it("écrit une ligne même sans valeur — « répondu sans valeur » est une information", () => {
     const signal = normaliserSignal({
-      code: "closure-lockstatus",
-      attributes: { group: "Closure", body: { value: null } },
+      code: "closure-islocked",
+      group: "Closure",
+      body: { value: null },
     })!;
     const snap = signalVersSnapshot(signal, { source: "smartcar", recuLe: RECU_LE });
 

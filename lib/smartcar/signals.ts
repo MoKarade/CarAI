@@ -55,21 +55,44 @@ export interface SignalNormalise {
 /**
  * Correspondances EXACTES code → métrique CarAI.
  *
- * ── CE QU'UNE LIVRAISON RÉELLE A APPRIS (06/08/2026) ─────────────────────────────────
+ * ── CE QUE LE VÉHICULE RÉEL A APPRIS (06/08/2026) ────────────────────────────────────
  * Le motif est `{groupe}-{nom en minuscules}`, et les booléens sont nommés `is…` :
- * `closure-islocked` et NON `closure-lockstatus`. Plusieurs hypothèses du Doc 2 §4.2
- * étaient donc fausses — sans conséquence, le repli par GROUPE les ayant toutes rattrapées.
- * C'est précisément ce que cette conception à trois niveaux devait absorber.
+ * `closure-islocked` et NON `closure-lockstatus`. Presque toutes les hypothèses du Doc 2
+ * §4.2 étaient fausses.
  *
- * Les entrées marquées ✓ viennent d'une livraison observée. Les autres restent des
- * hypothèses : elles seront confirmées ou corrigées à mesure que les signaux arrivent, et
- * `signal_code` conserve toujours le code d'origine pour reclasser sans rien perdre.
+ * ⚠️ ET C'EST LÀ QUE LE REPLI PAR GROUPE EST DEVENU DANGEREUX. Sur la bZ, le groupe
+ * `Charge` porte SIX signaux distincts et `Closure` en porte QUATRE — tous datés du même
+ * instant. Les ranger sous une métrique commune les met en collision avec l'index unique
+ * `(source, metric_type, recorded_at)` : le premier est écrit, les cinq autres sont
+ * silencieusement écartés comme des doublons. Sur quinze signaux fonctionnels, on n'en
+ * aurait enregistré que huit, sans la moindre erreur pour le signaler.
+ *
+ * Le repli par groupe est donc RETIRÉ du chemin d'écriture (voir `metriquePourSignal`).
+ * Il ne sert plus qu'à l'AFFICHAGE d'un code inconnu, où une collision n'a aucun effet.
+ *
+ * Entrées ✓ : confirmées sur le véhicule de Marc.
  */
 export const CORRESPONDANCE_EXACTE: Readonly<Record<string, MetricType>> = {
-  // ✓ Observés dans une livraison réelle
+  // ✓ Confirmés en SUCCESS sur la bZ XLE AWD 2026
   "tractionbattery-stateofcharge": "battery_soc",
+  "tractionbattery-range": "battery_range",
   "odometer-traveleddistance": "odometer",
+  "location-preciselocation": "location",
+  "wheel-tires": "tire_pressure",
   "closure-islocked": "lock_status",
+  "closure-doors": "door_status",
+  "closure-windows": "window_status",
+  // Sur un électrique, l'« engine cover » est le coffre avant (frunk).
+  "closure-enginecover": "frunk_status",
+  "charge-ischarging": "charging_status",
+  "charge-detailedchargingstatus": "charging_status_detail",
+  "charge-ischargingcableconnected": "charge_plugged_in",
+  "charge-ischargingportflapopen": "charge_port_status",
+  "charge-timetocomplete": "charge_time_remaining",
+  "charge-chargetimers": "charge_timers",
+
+  // ✓ Confirmés mais REFUSÉS par la bZ (VEHICLE_NOT_CAPABLE) — conservés pour que la
+  // donnée soit bien rangée si un autre véhicule les fournissait un jour.
   "connectivitystatus-isonline": "connectivity_online",
   "connectivitystatus-isasleep": "vehicle_asleep",
   "connectivitystatus-isdigitalkeypaired": "digital_key_paired",
@@ -77,30 +100,25 @@ export const CORRESPONDANCE_EXACTE: Readonly<Record<string, MetricType>> = {
   "vehicleidentification-nickname": "vehicle_nickname",
   "vehicleuseraccount-permissions": "account_permissions",
   "vehicleuseraccount-role": "account_role",
+  "closure-reartrunk": "trunk_status",
+  "closure-sunroof": "sunroof_status",
 
-  // — Hypothèses (Doc 2 §4.2), à confirmer à l'arrivée —
-  "tractionbattery-range": "battery_range",
+  // ✓ Confirmés mais bloqués par une PERMISSION manquante côté Connect.
+  "motion-currentspeed": "speed",
+  "vehicleidentification-vin": "vin",
+
+  // — Encore hypothétiques —
   "tractionbattery-capacity": "battery_capacity",
   "tractionbattery-nominalcapacity": "battery_capacity",
-  "charge-status": "charging_status",
-  "charge-chargingstatus": "charging_status",
-  "charge-ischarging": "charging_status",
-  "charge-ispluggedin": "charge_plugged_in",
   "charge-chargelimit": "charge_limit",
-  "charge-timetocomplete": "charge_time_remaining",
-  "location-preciselocation": "location",
-  "closure-doorstatus": "door_status",
-  "closure-windowstatus": "window_status",
-  "closure-trunkstatus": "trunk_status",
-  "closure-chargeportstatus": "charge_port_status",
-  "wheel-tirepressure": "tire_pressure",
-  "motion-speed": "speed",
   "lowvoltagebattery-stateofcharge": "low_voltage_battery",
 };
 
 /**
- * Repli par GROUPE. Les noms de groupes viennent de la liste officielle V3 (Doc 2 §4.1) —
- * c'est ce qui rend ce filet solide même quand le nom du signal est mal deviné.
+ * Groupe → métrique. ⚠️ SERT UNIQUEMENT À L'AFFICHAGE d'un code inconnu, JAMAIS au
+ * classement en base — voir l'avertissement de `CORRESPONDANCE_EXACTE` et
+ * `metriquePourSignal`. Deux signaux d'un même groupe se ranger sous la même métrique
+ * les met en collision avec l'index unique, et le second disparaît sans bruit.
  */
 export const CORRESPONDANCE_GROUPE: Readonly<Record<string, MetricType>> = {
   tractionbattery: "battery_soc",
@@ -222,17 +240,32 @@ export function normaliserSignal(brut: SignalBrut): SignalNormalise | null {
   };
 }
 
-/** Applique les trois niveaux de correspondance. Ne renvoie JAMAIS null : rien n'est jeté. */
-export function metriquePourSignal(code: string, groupe: string): MetricType {
-  const exact = CORRESPONDANCE_EXACTE[code];
-  if (exact) return exact;
-
-  const parGroupe = CORRESPONDANCE_GROUPE[groupe];
-  if (parGroupe && !GROUPES_HORS_SUJET.has(groupe)) return parGroupe;
-
-  // Dernier recours : le code brut EST la métrique. Illisible mais présent, donc
-  // récupérable. C'est le seul comportement qui ne perd pas de donnée.
-  return code;
+/**
+ * Métrique sous laquelle STOCKER un signal. Ne renvoie JAMAIS null : rien n'est jeté.
+ *
+ * ══ POURQUOI IL N'Y A PLUS DE REPLI PAR GROUPE ICI (correctif du 06/08/2026) ═════════
+ *
+ * La conception d'origine avait trois niveaux — code exact, puis groupe, puis code brut —
+ * pensés pour qu'un nom de signal mal deviné reste bien classé. Ça a effectivement
+ * rattrapé toutes les hypothèses fausses du Doc 2 §4.2.
+ *
+ * Mais le rapport de signaux de la bZ a montré le prix caché : le groupe `Charge` porte
+ * SIX signaux qui fonctionnent, `Closure` en porte QUATRE, et tous partagent le même
+ * horodatage. Les ranger sous une métrique commune les met en collision avec l'index
+ * unique `(source, metric_type, recorded_at)` : le premier est écrit, les autres sont
+ * écartés comme des doublons — silencieusement, puisque c'est exactement le comportement
+ * voulu pour une vraie re-livraison. Sur quinze signaux fonctionnels, huit auraient
+ * survécu, et rien n'aurait signalé la perte des sept autres.
+ *
+ * Le repli par groupe ne pouvait donc pas rester sur le chemin d'écriture. Un code inconnu
+ * devient sa PROPRE métrique : moins lisible, mais unique par construction — donc jamais
+ * perdu, et reclassable d'une requête SQL une fois qu'on sait ce qu'il est.
+ *
+ * `CORRESPONDANCE_GROUPE` survit pour l'AFFICHAGE (`libelle`), où deux signaux qui
+ * partagent une étiquette n'ont aucune conséquence.
+ */
+export function metriquePourSignal(code: string, _groupe?: string): MetricType {
+  return CORRESPONDANCE_EXACTE[code] ?? code;
 }
 
 /**
