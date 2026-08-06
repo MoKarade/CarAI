@@ -87,6 +87,14 @@ redondant par construction, est vidé après `WEBHOOK_RAW_RETENTION_JOURS` (90 p
 `0` = tout garder) ; les lignes de livraison restent. La page privée `/donnees` compare la
 base aux 15 signaux confirmés (`SIGNAUX_CONFIRMES_BZ`) et nomme les manquants.
 
+⚠️ **Garde anti-perte de la purge** (finding HIGH, revue adversariale du 06/08) : « le raw
+est redondant » n'est vrai que si le pipeline SAIT LIRE les livraisons. La purge ne touche
+donc JAMAIS un raw reçu après la **dernière écriture réussie** : si l'enveloppe Smartcar
+change (200 OK, 0 écrit), tout ce qui suit la casse est sanctuarisé jusqu'à réparation, et
+`/donnees` alerte « les livraisons arrivent mais rien ne s'écrit » (48 h sans écriture
+avec des livraisons récentes). Le statut par signal (`signal_status`) est en base : une
+ligne sans valeur reste interprétable après la purge du raw.
+
 ## Ce qui n'a pas pu être vérifié (et où ça en est)
 
 1. **`smartcar.com` est filtré par la politique d'egress** → le mapping avait été bâti sur

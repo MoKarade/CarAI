@@ -10,6 +10,7 @@ import {
   CORRESPONDANCE_EXACTE,
   SIGNAUX_CONFIRMES_BZ,
   codesDesSignaux,
+  nombreDeSignaux,
   interpreterPourcentage,
   metriquePourSignal,
   normaliserSignal,
@@ -247,6 +248,43 @@ describe("SIGNAUX_CONFIRMES_BZ — la liste de référence de la couverture", ()
   });
 });
 
+describe("aucun couple de codes vers la même métrique (collision d'index unique)", () => {
+  it("chaque métrique de CORRESPONDANCE_EXACTE n'a qu'UN code", () => {
+    // Deux codes partageant une métrique ET un horodatage : le second est écarté par
+    // l'index unique comme un doublon, en silence — la perte exacte que le correctif du
+    // repli par groupe (#10) a fermée. Ce test empêche de la réintroduire par la table.
+    const parMetrique = new Map<string, string[]>();
+    for (const [code, metrique] of Object.entries(CORRESPONDANCE_EXACTE)) {
+      parMetrique.set(metrique, [...(parMetrique.get(metrique) ?? []), code]);
+    }
+    for (const [metrique, codes] of parMetrique) {
+      expect(codes, `métrique ${metrique} partagée par ${codes.join(" et ")}`).toHaveLength(1);
+    }
+  });
+});
+
+describe("signalVersSnapshot — le STATUT fait partie de la mesure", () => {
+  it("écrit le statut déclaré par la source", () => {
+    const normalise = normaliserSignal({
+      code: "tractionbattery-stateofcharge",
+      body: {},
+      status: { value: "UNKNOWN" },
+    });
+    const ligne = signalVersSnapshot(normalise!, { source: "smartcar", recuLe: RECU_LE });
+    // Sans lui, une ligne sans valeur est ambiguë pour toujours : « la bZ a répondu
+    // UNKNOWN » et « la donnée a été refusée » se ressemblent, et le raw qui permettait
+    // de trancher est purgé après sa fenêtre de rétention.
+    expect(ligne.signalStatus).toBe("UNKNOWN");
+    expect(ligne.valueNumeric).toBeNull();
+  });
+
+  it("statut absent ⇒ null, jamais un « SUCCESS » inventé", () => {
+    const normalise = normaliserSignal({ code: "odometer-traveleddistance", body: { value: 5 } });
+    const ligne = signalVersSnapshot(normalise!, { source: "smartcar", recuLe: RECU_LE });
+    expect(ligne.signalStatus).toBeNull();
+  });
+});
+
 describe("codesDesSignaux — le journal dit LESQUELS, pas seulement combien", () => {
   it("liste les codes triés d'une charge réelle", () => {
     const codes = codesDesSignaux([
@@ -281,5 +319,27 @@ describe("codesDesSignaux — le journal dit LESQUELS, pas seulement combien", (
   it("rend une liste vide sur une charge absente", () => {
     expect(codesDesSignaux(null)).toEqual([]);
     expect(codesDesSignaux(undefined)).toEqual([]);
+  });
+});
+
+describe("nombreDeSignaux — le compte suit la MÊME coercition que l'écriture", () => {
+  it("compte l'objet indexé comme le tableau", () => {
+    // Compter `length` seulement sur un tableau affichait « 0 reçu » — le signal
+    // d'alarme par excellence — pour une charge en objet pourtant écrite normalement,
+    // avec un delta « sans code lisible » NÉGATIF (revue adversariale du 06/08/2026).
+    const objet = { "odometer-traveleddistance": { body: { value: 5 } } };
+    expect(nombreDeSignaux(objet)).toBe(1);
+    expect(nombreDeSignaux([{ code: "a" }, { code: "b" }])).toBe(2);
+  });
+
+  it("compte aussi les signaux SANS code lisible (l'écart reste positif et visible)", () => {
+    const charge = [{ code: "closure-islocked" }, { body: { value: 42 } }];
+    expect(nombreDeSignaux(charge)).toBe(2);
+    expect(codesDesSignaux(charge)).toHaveLength(1);
+  });
+
+  it("rend 0 sur une charge absente", () => {
+    expect(nombreDeSignaux(null)).toBe(0);
+    expect(nombreDeSignaux(undefined)).toBe(0);
   });
 });

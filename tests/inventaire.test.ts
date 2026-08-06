@@ -22,7 +22,11 @@ import {
   journalLivraisons,
   type LigneInventaire,
 } from "@/lib/vehicle/inventaire";
-import { purgerRawWebhooks, retentionRawJours } from "@/lib/smartcar/ingest";
+import {
+  derniereEcritureReussie,
+  purgerRawWebhooks,
+  retentionRawJours,
+} from "@/lib/smartcar/ingest";
 import { SIGNAUX_CONFIRMES_BZ } from "@/lib/smartcar/signals";
 
 const client = new PGlite();
@@ -81,6 +85,22 @@ describe("inventaireMesures — agrégat par (source, métrique, code)", () => {
 
     const inventaire = await inventaireMesures(dbx);
     expect(inventaire.map((l) => l.source).sort()).toEqual(["smartcar", "toyota_na"]);
+  });
+
+  it("ordre DÉTERMINISTE quand deux codes partagent une métrique", async () => {
+    // Sans signal_code dans l'ORDER BY, l'ordre relatif dépend du plan d'exécution :
+    // deux chargements de /donnees pouvaient montrer les lignes inversées, et une
+    // comparaison de captures ferait croire à un changement de données.
+    // Deux instants distincts : au MÊME instant, l'index unique refuserait la seconde
+    // ligne — c'est le comportement voulu (et la raison pour laquelle deux codes ne
+    // doivent jamais partager une métrique, cf. tests/signals.test.ts).
+    await dbTest.insert(vehicleSnapshots).values([
+      { recordedAt: T0, source: "smartcar", metricType: "battery_capacity", signalCode: "zzz-code", valueNumeric: 71 },
+      { recordedAt: T1, source: "smartcar", metricType: "battery_capacity", signalCode: "aaa-code", valueNumeric: 70 },
+    ]);
+
+    const inventaire = await inventaireMesures(dbx);
+    expect(inventaire.map((l) => l.signalCode)).toEqual(["aaa-code", "zzz-code"]);
   });
 });
 
@@ -200,6 +220,67 @@ describe("purgerRawWebhooks — le transport se vide, RIEN d'autre", () => {
     expect(mesures).toHaveLength(1);
     expect(mesures[0]!.valueNumeric).toBe(500);
   });
+
+  // ══ LA GARDE ANTI-PERTE (finding HIGH de la revue adversariale du 06/08/2026) ═══════
+  // Si le pipeline ne sait plus LIRE les livraisons (enveloppe Smartcar changée), chaque
+  // livraison répond 200 en écrivant 0 snapshot — le raw devient l'UNIQUE copie des
+  // mesures, et une purge naïve la détruirait à J+90.
+
+  it("GARDE : une base qui n'a JAMAIS rien écrit ne purge rien", async () => {
+    await dbTest.insert(webhookDeliveries).values([
+      { eventId: "cassee-1", eventType: "VEHICLE_STATE", receivedAt: VIEILLE, snapshotsWritten: 0, raw: { seule: "copie" } },
+    ]);
+    const purgees = await purgerRawWebhooks({
+      maintenant: MAINTENANT,
+      retentionJours: 90,
+      dbx: dbxPurge,
+    });
+    expect(purgees).toBe(0);
+
+    const lignes = await dbTest.select().from(webhookDeliveries);
+    expect(lignes[0]!.raw).toEqual({ seule: "copie" });
+  });
+
+  it("GARDE : un raw reçu APRÈS la dernière écriture réussie est sanctuarisé, même hors fenêtre", async () => {
+    const ECRITURE = new Date("2026-06-01T00:00:00.000Z"); // dernière écriture réussie
+    const CASSEE = new Date("2026-07-01T00:00:00.000Z"); // 137 jours avant MAINTENANT : hors fenêtre
+    await dbTest.insert(webhookDeliveries).values([
+      { eventId: "saine", eventType: "VEHICLE_STATE", receivedAt: ECRITURE, snapshotsWritten: 5, raw: { redondant: true } },
+      { eventId: "cassee", eventType: "VEHICLE_STATE", receivedAt: CASSEE, snapshotsWritten: 0, raw: { seule: "copie" } },
+    ]);
+
+    const purgees = await purgerRawWebhooks({
+      maintenant: MAINTENANT,
+      retentionJours: 90,
+      dbx: dbxPurge,
+    });
+
+    // Seule la livraison ANTÉRIEURE (ou égale) à la dernière écriture est purgeable : son
+    // contenu a été ingéré par un pipeline qui fonctionnait encore. Tout ce qui suit la
+    // dernière écriture est peut-être l'unique copie — il attend la réparation.
+    expect(purgees).toBe(1);
+    const lignes = await dbTest.select().from(webhookDeliveries);
+    expect(lignes.find((l) => l.eventId === "saine")!.raw).toBeNull();
+    expect(lignes.find((l) => l.eventId === "cassee")!.raw).toEqual({ seule: "copie" });
+  });
+});
+
+describe("derniereEcritureReussie — le signal qui distingue dédup et pipeline cassé", () => {
+  it("rend la date de la dernière livraison qui a ÉCRIT, ignore les 0", async () => {
+    await dbTest.insert(webhookDeliveries).values([
+      { eventId: "w1", eventType: "VEHICLE_STATE", receivedAt: T0, snapshotsWritten: 11, raw: {} },
+      { eventId: "w2", eventType: "VEHICLE_STATE", receivedAt: T2, snapshotsWritten: 0, raw: {} },
+    ]);
+    const date = await derniereEcritureReussie(dbx);
+    expect(date?.toISOString()).toBe(T0.toISOString());
+  });
+
+  it("null quand rien n'a jamais été écrit — distinct de « pas de livraison »", async () => {
+    await dbTest.insert(webhookDeliveries).values([
+      { eventId: "w3", eventType: "VEHICLE_STATE", receivedAt: T0, snapshotsWritten: 0, raw: {} },
+    ]);
+    expect(await derniereEcritureReussie(dbx)).toBeNull();
+  });
 });
 
 describe("retentionRawJours — une variable mal tapée ne change pas la politique", () => {
@@ -210,5 +291,12 @@ describe("retentionRawJours — une variable mal tapée ne change pas la politiq
     expect(retentionRawJours({ WEBHOOK_RAW_RETENTION_JOURS: "abc" })).toBe(90);
     expect(retentionRawJours({ WEBHOOK_RAW_RETENTION_JOURS: "-5" })).toBe(90);
     expect(retentionRawJours({ WEBHOOK_RAW_RETENTION_JOURS: " " })).toBe(90);
+  });
+
+  it("une valeur FRACTIONNAIRE retombe au défaut — jamais arrondie vers 0 = « tout garder »", () => {
+    // `Math.floor("0.5")` donnait 0, le sentinel « conserver pour toujours » : demander
+    // une rétention PLUS courte désactivait la purge, en silence (revue du 06/08/2026).
+    expect(retentionRawJours({ WEBHOOK_RAW_RETENTION_JOURS: "0.5" })).toBe(90);
+    expect(retentionRawJours({ WEBHOOK_RAW_RETENTION_JOURS: "7.5" })).toBe(90);
   });
 });

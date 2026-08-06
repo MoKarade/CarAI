@@ -160,8 +160,11 @@ export const RETENTION_RAW_JOURS_DEFAUT = 90;
 
 /**
  * Fenêtre de rétention du `raw` des livraisons, lue de `WEBHOOK_RAW_RETENTION_JOURS`.
- * `0` = conserver pour toujours. Valeur absente, non numérique ou négative → défaut :
- * une variable mal tapée ne doit pas déclencher une purge inattendue ni l'annuler en silence.
+ * `0` = conserver pour toujours. Valeur absente, non numérique, négative ou NON ENTIÈRE
+ * → défaut : une variable mal tapée ne doit pas déclencher une purge inattendue ni
+ * l'annuler en silence. Le cas non entier est un piège concret : `0.5` passé par un
+ * `Math.floor` donnerait 0 — le sentinel « tout garder » — pour une intention de rétention
+ * PLUS courte (revue adversariale du 06/08/2026).
  */
 export function retentionRawJours(
   env: Record<string, string | undefined> = process.env,
@@ -169,24 +172,40 @@ export function retentionRawJours(
   const brut = env.WEBHOOK_RAW_RETENTION_JOURS?.trim();
   if (!brut) return RETENTION_RAW_JOURS_DEFAUT;
   const n = Number(brut);
-  if (!Number.isFinite(n) || n < 0) return RETENTION_RAW_JOURS_DEFAUT;
-  return Math.floor(n);
+  if (!Number.isInteger(n) || n < 0) return RETENTION_RAW_JOURS_DEFAUT;
+  return n;
 }
 
 /**
  * Vide le payload BRUT (`raw`) des livraisons plus vieilles que la fenêtre de rétention.
  *
  * ══ CE QUE ÇA SUPPRIME, ET CE QUE ÇA NE SUPPRIME JAMAIS ══════════════════════════════
- * Le `raw` est un artefact de DIAGNOSTIC, redondant par construction : depuis le correctif
- * de collision (#10), CHAQUE signal d'une livraison — connu ou inconnu — devient son propre
- * snapshot dans `vehicle_snapshots`, où il est conservé À VIE. Les MESURES ne sont donc
- * jamais touchées ici ; seule la copie brute du JSON de transport disparaît, et la LIGNE de
- * livraison reste (idempotence + surveillance du silence intactes).
+ * Le `raw` est un artefact de DIAGNOSTIC, LARGEMENT redondant : depuis le correctif de
+ * collision (#10), chaque signal d'une livraison — connu ou inconnu — devient son propre
+ * snapshot dans `vehicle_snapshots` (valeur, unité, horodatages, et depuis cette revue le
+ * STATUT par signal), où il est conservé À VIE. Les MESURES ne sont donc jamais touchées
+ * ici ; seule la copie brute du JSON de transport disparaît, et la LIGNE de livraison
+ * reste (idempotence + surveillance du silence intactes). Ce qui n'est PAS reconstruit et
+ * disparaît avec le raw, assumé : `triggers` (pourquoi Smartcar a livré) et `retrievedAt`
+ * par signal — du transport, pas de la mesure.
  *
  * Pourquoi purger : à ~5 Ko par livraison et une livraison par heure ou plus, le `raw`
  * accumule des dizaines de Mo PAR AN de JSON répété — sur le demi-Go du plan Neon gratuit,
  * c'est LUI qui menace l'objectif « stocker plusieurs années », pas les mesures. Et il
  * contient la position GPS en double : en garder moins est aussi une décision de vie privée.
+ *
+ * ══ LA GARDE ANTI-PERTE (finding HIGH de la revue du 06/08/2026) ═════════════════════
+ * « Redondant » n'est vrai que si le pipeline SAIT LIRE les livraisons. Si Smartcar change
+ * son enveloppe (`data.signals` renommé, `code` renommé…), chaque livraison répond 200 en
+ * écrivant 0 snapshot — et le raw devient la SEULE copie des mesures. Une purge naïve la
+ * détruirait à J+90, avant que quiconque ait vu le trou.
+ *
+ * D'où la clause : on ne purge JAMAIS un raw reçu APRÈS la dernière écriture réussie
+ * (`snapshots_written > 0`). Pipeline cassé ⇒ la dernière écriture date d'avant la casse ⇒
+ * tout ce qui suit est sanctuarisé jusqu'à réparation (puis re-ingérable depuis le raw).
+ * Pipeline sain ⇒ des écritures récentes existent ⇒ la purge suit son cours. Et une base
+ * qui n'a JAMAIS rien écrit ne purge rien. Un « 0 écrit » isolé (déduplication normale)
+ * ne bloque rien : il suffit d'UNE écriture plus récente dans l'historique.
  *
  * `WEBHOOK_RAW_RETENTION_JOURS=0` désactive la purge (tout garder).
  */
@@ -210,13 +229,69 @@ export async function purgerRawWebhooks(
   const resultat = await dbx.execute(sql`
     UPDATE webhook_deliveries
     SET raw = NULL
-    WHERE received_at < ${limite.toISOString()} AND raw IS NOT NULL
+    WHERE received_at < ${limite.toISOString()}
+      AND raw IS NOT NULL
+      AND received_at <= (
+        SELECT COALESCE(MAX(received_at), '-infinity'::timestamptz)
+        FROM webhook_deliveries
+        WHERE snapshots_written > 0
+      )
     RETURNING event_id
   `);
   const lignes =
     (resultat as { rows?: unknown[] }).rows ??
     (Array.isArray(resultat) ? (resultat as unknown[]) : []);
   return lignes.length;
+}
+
+/**
+ * Trace une livraison `VEHICLE_ERROR` dans le journal des livraisons.
+ *
+ * Sans cette trace, « quels signaux le véhicule refuse, et depuis quand » ne vivait que
+ * dans les logs Vercel — éphémères. Or c'est l'information qui explique un TROU dans une
+ * série des mois plus tard (revue du 06/08/2026) : la ligne reste pour toujours (date +
+ * type), le raw suit la même fenêtre de rétention que les autres livraisons. Recevoir un
+ * VEHICLE_ERROR compte aussi, à raison, comme « le webhook est vivant » pour la détection
+ * de silence.
+ */
+export async function tracerLivraisonErreur(params: {
+  eventId: string | null;
+  raw: unknown;
+  recuLe?: Date;
+}): Promise<void> {
+  const { eventId, raw, recuLe = new Date() } = params;
+  await db
+    .insert(webhookDeliveries)
+    .values({
+      eventId: eventId ?? empreinte(JSON.stringify(raw ?? {})),
+      eventType: "VEHICLE_ERROR",
+      receivedAt: recuLe,
+      snapshotsWritten: 0,
+      raw: raw as object,
+    })
+    .onConflictDoNothing();
+}
+
+/**
+ * Date de la dernière livraison dont AU MOINS un snapshot a été écrit, ou `null` si
+ * aucune écriture n'a jamais eu lieu.
+ *
+ * C'est le signal qui distingue « les livraisons arrivent et tout est déjà connu »
+ * (déduplication, normal sur quelques heures) de « les livraisons arrivent mais le
+ * pipeline n'écrit PLUS RIEN » (enveloppe changée, mapping cassé — la panne muette que
+ * le bandeau de couverture, cumulatif à vie, ne peut pas voir).
+ */
+export async function derniereEcritureReussie(
+  dbx: Pick<typeof db, "select"> = db,
+): Promise<Date | null> {
+  const lignes = await dbx
+    .select({ receivedAt: webhookDeliveries.receivedAt })
+    .from(webhookDeliveries)
+    .where(sql`${webhookDeliveries.snapshotsWritten} > 0`)
+    .orderBy(desc(webhookDeliveries.receivedAt))
+    .limit(1);
+  const date = lignes[0]?.receivedAt ?? null;
+  return date instanceof Date ? date : date ? new Date(date) : null;
 }
 
 /**

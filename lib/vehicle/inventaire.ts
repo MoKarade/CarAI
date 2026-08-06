@@ -43,7 +43,7 @@ export async function inventaireMesures(dbx: Dbx = db): Promise<LigneInventaire[
       MAX(recorded_at) AS derniere
     FROM vehicle_snapshots
     GROUP BY source, metric_type, signal_code
-    ORDER BY source, metric_type
+    ORDER BY source, metric_type, signal_code
   `);
 
   const lignes = ((resultat as { rows?: unknown[] }).rows ??

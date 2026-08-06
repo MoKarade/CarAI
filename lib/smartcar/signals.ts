@@ -108,8 +108,12 @@ export const CORRESPONDANCE_EXACTE: Readonly<Record<string, MetricType>> = {
   "vehicleidentification-vin": "vin",
 
   // — Encore hypothétiques —
+  // ⚠️ JAMAIS deux codes vers la MÊME métrique : s'ils arrivaient au même horodatage, le
+  // second serait écarté par l'index unique comme un doublon — la collision exacte que le
+  // correctif du 06/08 (#10) a retirée du repli par groupe. Deux capacités distinctes chez
+  // la source restent deux métriques distinctes chez nous.
   "tractionbattery-capacity": "battery_capacity",
-  "tractionbattery-nominalcapacity": "battery_capacity",
+  "tractionbattery-nominalcapacity": "battery_capacity_nominal",
   "charge-chargelimit": "charge_limit",
   "lowvoltagebattery-stateofcharge": "low_voltage_battery",
 };
@@ -339,6 +343,10 @@ export function signalVersSnapshot(
     source: options.source,
     metricType,
     signalCode: signal.code,
+    // Le statut fait partie de la MESURE : sans lui, une ligne sans valeur est ambiguë
+    // pour toujours (« UNKNOWN » vs « refusé »), et le raw qui permettait de trancher est
+    // purgé après sa fenêtre de rétention.
+    signalStatus: signal.statut,
     unit: signal.unite,
     valueNumeric: null,
     valueText: null,
@@ -378,6 +386,17 @@ export function codesDesSignaux(signaux: unknown): string[] {
     .map((brut) => normaliserSignal(brut)?.code)
     .filter((code): code is string => Boolean(code))
     .sort();
+}
+
+/**
+ * Nombre de signaux d'une charge utile, TOUTES formes confondues (tableau ou objet
+ * indexé) — la MÊME coercition que le chemin d'écriture. Compter `length` seulement sur
+ * un tableau faisait afficher « 0 reçu » (le signal d'alarme par excellence) pour une
+ * charge en objet pourtant écrite normalement, avec un delta « sans code lisible »
+ * NÉGATIF en prime (revue adversariale du 06/08/2026).
+ */
+export function nombreDeSignaux(signaux: unknown): number {
+  return listeDeSignaux(signaux).length;
 }
 
 /**

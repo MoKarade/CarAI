@@ -38,10 +38,16 @@ Le rapport Smartcar du 06/08 fait foi : **15 signaux confirmés `SUCCESS`** sur 
   (déduplication structurelle) : ~20-60 Mo/an, des années de marge sur le demi-Go Neon.
 - **Le JSON BRUT des livraisons est purgé après 90 jours** (`WEBHOOK_RAW_RETENTION_JOURS`,
   `0` = tout garder). Il est redondant — chaque signal, connu ou inconnu, est déjà un
-  snapshot — et c'était LUI qui aurait rempli le plan gratuit en 1 à 3 ans. Les lignes de
-  livraison restent (idempotence + détection de silence) ; seul le blob est vidé.
-  Verrouillé par `tests/inventaire.test.ts` (PGlite, vrai schéma), discrimination prouvée
-  par mutation (DELETE au lieu d'UPDATE → test rouge).
+  snapshot, STATUT compris (`signal_status`) — et c'était LUI qui aurait rempli le plan
+  gratuit en 1 à 3 ans. Les lignes de livraison restent (idempotence + détection de
+  silence) ; seul le blob est vidé. Verrouillé par `tests/inventaire.test.ts` (PGlite,
+  vrai schéma), discrimination prouvée par mutation (DELETE au lieu d'UPDATE → test rouge).
+- **Garde anti-perte** (finding HIGH de la revue adversariale pré-merge, 21 agents) : la
+  purge ne touche JAMAIS un raw reçu après la dernière écriture réussie. Si l'enveloppe
+  Smartcar change (livraisons 200, 0 écrit), le raw devient l'unique copie des mesures —
+  sanctuarisé jusqu'à réparation, et `/donnees` alerte « les livraisons arrivent mais
+  rien ne s'écrit » (48 h sans écriture avec livraisons récentes). Les `VEHICLE_ERROR`
+  sont désormais tracés en base, plus seulement dans les logs éphémères.
 - **Sauvegarde externe : rien en place.** Neon gratuit n'a qu'une restauration courte —
   et le dépôt étant PUBLIC, aucun dump n'y sera jamais poussé. → `[DATA-01]`.
 

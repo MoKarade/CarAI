@@ -26,8 +26,17 @@ import {
 } from "@/lib/vehicle/inventaire";
 import { formaterAge, libelle, nomSource } from "@/lib/vehicle/state";
 import { NonAutorise, requireSession } from "@/lib/session";
-import { retentionRawJours } from "@/lib/smartcar/ingest";
+import { derniereEcritureReussie, retentionRawJours } from "@/lib/smartcar/ingest";
 import { SIGNAUX_CONFIRMES_BZ, metriquePourSignal } from "@/lib/smartcar/signals";
+
+/**
+ * Seuils de la détection « le pipeline n'écrit plus » : des livraisons dans les dernières
+ * 24 h mais AUCUNE écriture depuis 48 h. La déduplication rend « 0 écrit » normal sur
+ * quelques heures ; sur deux jours, un véhicule qui livre sans qu'une seule mesure change
+ * n'existe pas — c'est la signature d'une enveloppe qui a changé ou d'un mapping cassé.
+ */
+const FENETRE_LIVRAISON_RECENTE_H = 24;
+const SEUIL_ECRITURE_SILENCIEUSE_H = 48;
 
 export const dynamic = "force-dynamic";
 
@@ -75,11 +84,13 @@ export default async function Donnees() {
 
   let inventaire: LigneInventaire[];
   let livraisons: LigneLivraison[];
+  let derniereEcriture: Date | null;
   try {
     await assurerMigrations();
-    [inventaire, livraisons] = await Promise.all([
+    [inventaire, livraisons, derniereEcriture] = await Promise.all([
       inventaireMesures(),
       journalLivraisons(30),
+      derniereEcritureReussie(),
     ]);
   } catch (err) {
     console.error("[donnees] lecture impossible", err);
@@ -95,10 +106,34 @@ export default async function Donnees() {
   const totalMesures = inventaire.reduce((somme, l) => somme + l.nbMesures, 0);
   const retention = retentionRawJours();
 
+  // « Livraisons récentes mais plus AUCUNE écriture » : la panne muette par excellence.
+  // Le bandeau de couverture est cumulatif à vie — un flux qui a cessé d'écrire y reste
+  // vert. Cette alerte-ci regarde le PRÉSENT.
+  const derniereLivraison = livraisons[0]?.receivedAt ?? null;
+  const fluxMuet =
+    derniereLivraison !== null &&
+    maintenant - derniereLivraison.getTime() < FENETRE_LIVRAISON_RECENTE_H * 3_600_000 &&
+    (derniereEcriture === null ||
+      maintenant - derniereEcriture.getTime() > SEUIL_ECRITURE_SILENCIEUSE_H * 3_600_000);
+
   return (
     <Coquille titre="Inventaire des données">
+      {/* ── FLUX MUET : prime sur tout, y compris le bandeau vert ───────────────────── */}
+      {fluxMuet && (
+        <p className="lead" role="alert">
+          Les livraisons Smartcar arrivent, mais PLUS RIEN ne s’écrit
+          {derniereEcriture
+            ? ` depuis ${formaterAge((maintenant - derniereEcriture.getTime()) / 60_000).replace("il y a ", "")}`
+            : " (aucune écriture réussie en base)"}
+          . Sur deux jours, ce n’est pas la déduplication : l’enveloppe Smartcar a
+          probablement changé. Les payloads bruts des livraisons concernées sont conservés
+          (la purge s’arrête d’elle-même tant que rien ne s’écrit) — rien n’est perdu, mais
+          il faut corriger la lecture.
+        </p>
+      )}
+
       {/* ── COUVERTURE : la ligne à lire en premier ─────────────────────────────────── */}
-      {couverture.manquants.length === 0 && couverture.recus.length > 0 && (
+      {couverture.manquants.length === 0 && couverture.recus.length > 0 && !fluxMuet && (
         <p className="lead" role="status">
           Les {SIGNAUX_CONFIRMES_BZ.length} signaux confirmés de la bZ sont tous présents en
           base. Aucune donnée attendue ne manque.
@@ -217,7 +252,7 @@ export default async function Donnees() {
             données entre deux livraisons. C’est l’absence de livraison pendant des heures
             qui serait un signal de panne.
             {retention > 0
-              ? ` Le JSON brut de transport est vidé après ${retention} jours (les mesures, elles, sont conservées à vie).`
+              ? ` Le JSON brut de transport est vidé après ${retention} jours — jamais au-delà de la dernière écriture réussie, et les mesures, elles, sont conservées à vie.`
               : " Le JSON brut de transport est conservé sans limite (WEBHOOK_RAW_RETENTION_JOURS=0)."}
           </p>
         </>
