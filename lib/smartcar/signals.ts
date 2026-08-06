@@ -297,7 +297,13 @@ export function normaliserSignal(brut: SignalBrut): SignalNormalise | null {
   const nom =
     chaine(brut.name) ?? chaine(attrs.name) ?? codeMinuscule.split("-").slice(1).join("-");
 
-  const statutTexte = chaine(statut.value) ?? chaine(brut.status);
+  // Le statut porte son MOTIF quand la source le donne : `ERROR (COMPATIBILITY)` dit
+  // « la bZ ne sait pas faire » (à retirer de la souscription), `ERROR (PERMISSION)` dit
+  // « débloquable par re-Connect ». Un `ERROR` nu ne permettait pas ce tri (revue 06/08).
+  const valeurStatut = chaine(statut.value) ?? chaine(brut.status);
+  const typeErreur = chaine(objet(statut.error)?.type);
+  const statutTexte =
+    valeurStatut === "ERROR" && typeErreur ? `ERROR (${typeErreur})` : valeurStatut;
   const corpsSansUnite = Object.fromEntries(
     Object.entries(body).filter(([cle]) => cle !== "unit"),
   );
@@ -506,6 +512,29 @@ export function codesDesSignaux(signaux: unknown): string[] {
  */
 export function nombreDeSignaux(signaux: unknown): number {
   return listeDeSignaux(signaux).length;
+}
+
+/**
+ * Ventilation des STATUTS d'une charge utile : combien de SUCCESS, et quels codes la
+ * source REFUSE (avec leur motif). C'est la réponse vivante à « lesquels marchent ? » —
+ * lisible dans les journaux à chaque livraison, sans requête SQL.
+ */
+export function resumerStatutsSignaux(signaux: unknown): {
+  succes: string[];
+  enEchec: Array<{ code: string; statut: string }>;
+} {
+  const succes: string[] = [];
+  const enEchec: Array<{ code: string; statut: string }> = [];
+  for (const brut of listeDeSignaux(signaux)) {
+    const normalise = normaliserSignal(brut);
+    if (!normalise) continue;
+    const statut = normalise.statut?.toUpperCase() ?? null;
+    if (statut === null || statut === "SUCCESS") succes.push(normalise.code);
+    else enEchec.push({ code: normalise.code, statut });
+  }
+  succes.sort();
+  enEchec.sort((a, b) => a.code.localeCompare(b.code));
+  return { succes, enEchec };
 }
 
 /**

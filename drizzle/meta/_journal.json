@@ -15,6 +15,13 @@
       "when": 1786026838377,
       "tag": "0001_burly_shockwave",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786037308692,
+      "tag": "0002_happy_lyja",
+      "breakpoints": true
     }
   ]
 }

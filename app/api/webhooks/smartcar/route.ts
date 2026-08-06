@@ -35,7 +35,11 @@ import {
   resumerErreursVehicule,
 } from "@/lib/smartcar/webhook";
 import { ingererLivraison, tracerLivraisonErreur } from "@/lib/smartcar/ingest";
-import { codesDesSignaux, nombreDeSignaux } from "@/lib/smartcar/signals";
+import {
+  codesDesSignaux,
+  nombreDeSignaux,
+  resumerStatutsSignaux,
+} from "@/lib/smartcar/signals";
 import { assurerMigrations } from "@/lib/migrations";
 import { baseConfiguree } from "@/lib/db";
 
@@ -186,12 +190,22 @@ export async function POST(request: Request): Promise<Response> {
     // illisible (sans code) reste visible comme écart POSITIF entre reçus et codes.
     const recus = nombreDeSignaux(evenement.signaux);
     const codes = codesDesSignaux(evenement.signaux);
+    const statuts = resumerStatutsSignaux(evenement.signaux);
     console.log(
       `[smartcar] livraison ${evenement.eventId ?? "sans-id"} : ${recus} signal(aux) reçu(s), ` +
         `${ecrits} enregistré(s)${dejaTraite ? " (déjà traitée)" : ""}${ignoree ? " (simulée, ignorée)" : ""}.` +
         (codes.length > 0 ? ` Codes : ${codes.join(", ")}` : "") +
         (recus !== codes.length ? ` (${recus - codes.length} sans code lisible)` : ""),
     );
+    // La ventilation des STATUTS sur une ligne dédiée : c'est la réponse vivante à
+    // « lesquels marchent ? », lisible sans requête SQL. Les refus portent leur motif.
+    if (statuts.enEchec.length > 0) {
+      console.warn(
+        `[smartcar] statuts${ignoree ? " (simulée)" : ""} : ${statuts.succes.length} SUCCESS ; ` +
+          `${statuts.enEchec.length} en échec — ` +
+          statuts.enEchec.map((e) => `${e.code}(${e.statut})`).join(", "),
+      );
+    }
 
     return Response.json(
       { ok: true, recus, ecrits, dejaTraite, ignoree },
