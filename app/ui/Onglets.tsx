@@ -9,6 +9,7 @@ import Link from "next/link";
 const ONGLETS = [
   { href: "/", label: "Tableau de bord" },
   { href: "/donnees", label: "Base de données" },
+  { href: "/analyse", label: "Analyse" },
 ] as const;
 
 export function Onglets({ actif }: { actif: (typeof ONGLETS)[number]["href"] }) {

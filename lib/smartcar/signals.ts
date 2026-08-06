@@ -509,6 +509,29 @@ export function nombreDeSignaux(signaux: unknown): number {
 }
 
 /**
+ * Ventilation des STATUTS d'une charge utile : combien de SUCCESS, et quels codes la
+ * source REFUSE (avec leur motif). C'est la réponse vivante à « lesquels marchent ? » —
+ * lisible dans les journaux à chaque livraison, sans requête SQL.
+ */
+export function resumerStatutsSignaux(signaux: unknown): {
+  succes: string[];
+  enEchec: Array<{ code: string; statut: string }>;
+} {
+  const succes: string[] = [];
+  const enEchec: Array<{ code: string; statut: string }> = [];
+  for (const brut of listeDeSignaux(signaux)) {
+    const normalise = normaliserSignal(brut);
+    if (!normalise) continue;
+    const statut = normalise.statut?.toUpperCase() ?? null;
+    if (statut === null || statut === "SUCCESS") succes.push(normalise.code);
+    else enEchec.push({ code: normalise.code, statut });
+  }
+  succes.sort();
+  enEchec.sort((a, b) => a.code.localeCompare(b.code));
+  return { succes, enEchec };
+}
+
+/**
  * Coercition d'une charge utile en liste de signaux bruts — tableau ou objet indexé.
  * Partagée entre l'ÉCRITURE (`signauxVersSnapshots`) et le JOURNAL (`codesDesSignaux`) :
  * deux lectures séparées finiraient par diverger, et le journal mentirait sur ce qui
