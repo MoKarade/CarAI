@@ -26,13 +26,21 @@ import { assurerMigrations } from "@/lib/migrations";
 import { classerPanne, messagePanne } from "@/lib/panne";
 import {
   bilanCouverture,
-  dernieresMesures,
   inventaireMesures,
   journalLivraisons,
   type LigneInventaire,
   type LigneLivraison,
-  type MesureBrute,
 } from "@/lib/vehicle/inventaire";
+import {
+  PERIODES,
+  depuisPourPeriode,
+  listerMesures,
+  pageEffective,
+  periodeValide,
+  valeurAffichable,
+  type Periode,
+} from "@/lib/vehicle/mesures";
+import type { VehicleSnapshot } from "@/lib/db/schema";
 import { formaterAge, libelle, nomSource } from "@/lib/vehicle/state";
 import { NonAutorise, requireSession } from "@/lib/session";
 import { derniereEcritureReussie, retentionRawJours } from "@/lib/smartcar/ingest";
@@ -73,17 +81,36 @@ function Coquille({ titre, children }: { titre: string; children: React.ReactNod
   );
 }
 
-/** Valeur d'une mesure brute pour l'affichage — sans jamais sortir le contenu d'un JSON. */
-function valeurBrute(m: MesureBrute): string {
-  if (m.valueNumeric !== null) {
-    return `${m.valueNumeric}${m.unit ? ` ${m.unit}` : ""}`;
-  }
-  if (m.valueText !== null) return m.valueText;
-  if (m.aDetailJson) return "détail en base";
-  return "non communiqué";
+/** Taille d'une page du tableau. L'export CSV, lui, n'a pas de page : il livre tout. */
+const TAILLE_PAGE = 100;
+
+type ParametresRecherche = Record<string, string | string[] | undefined>;
+
+function texteParam(params: ParametresRecherche, cle: string): string | null {
+  const v = params[cle];
+  const texte = Array.isArray(v) ? v[0] : v;
+  return texte?.trim() || null;
 }
 
-export default async function Donnees() {
+/** Reconstruit la query string des filtres — pour l'export et la pagination. */
+function queryFiltres(
+  filtres: { metrique: string | null; source: string | null; periode: string },
+  page?: number,
+): string {
+  const q = new URLSearchParams();
+  if (filtres.metrique) q.set("metrique", filtres.metrique);
+  if (filtres.source) q.set("source", filtres.source);
+  if (filtres.periode !== "tout") q.set("periode", filtres.periode);
+  if (page && page > 1) q.set("page", String(page));
+  const s = q.toString();
+  return s ? `?${s}` : "";
+}
+
+export default async function Donnees({
+  searchParams,
+}: {
+  searchParams: Promise<ParametresRecherche>;
+}) {
   try {
     await requireSession();
   } catch (err) {
@@ -101,18 +128,58 @@ export default async function Donnees() {
     );
   }
 
+  // ── Filtres du tableau, lus de l'URL (form GET : lisible, partageable, sans JS) ─────
+  // La période est NORMALISÉE tout de suite : un `?periode=48h` inconnu (signet périmé,
+  // faute de frappe) doit se LIRE « tout l'historique » partout — sélecteur compris —
+  // plutôt qu'afficher « 24h » au-dessus d'une table qui couvre tout (revue du 06/08).
+  const params = await searchParams;
+  const filtresUrl = {
+    metrique: texteParam(params, "metrique"),
+    source: texteParam(params, "source"),
+    periode: periodeValide(texteParam(params, "periode")) as string,
+  };
+  const pageBrute = Number(texteParam(params, "page") ?? "1");
+  const pageDemandee = Number.isInteger(pageBrute) && pageBrute >= 1 ? pageBrute : 1;
+  const instantRequete = new Date();
+  const filtresRequete = {
+    metricType: filtresUrl.metrique,
+    source: filtresUrl.source,
+    depuis: depuisPourPeriode(filtresUrl.periode, instantRequete),
+  };
+
   let inventaire: LigneInventaire[];
   let livraisons: LigneLivraison[];
   let derniereEcriture: Date | null;
-  let mesures: MesureBrute[];
+  let mesures: VehicleSnapshot[];
+  let totalSelection: number;
+  let page = pageDemandee;
   try {
     await assurerMigrations();
-    [inventaire, livraisons, derniereEcriture, mesures] = await Promise.all([
+    let selection: Awaited<ReturnType<typeof listerMesures>>;
+    [inventaire, livraisons, derniereEcriture, selection] = await Promise.all([
       inventaireMesures(),
       journalLivraisons(30),
       derniereEcritureReussie(),
-      dernieresMesures(200),
+      listerMesures({
+        filtres: filtresRequete,
+        limite: TAILLE_PAGE,
+        offset: (pageDemandee - 1) * TAILLE_PAGE,
+      }),
     ]);
+    totalSelection = selection.total ?? 0;
+
+    // Page au-delà de la fin (vieux lien, sélection rétrécie sous le rafraîchissement
+    // auto) : on sert la DERNIÈRE page réelle plutôt qu'un faux « aucune mesure » sans
+    // lien de retour (revue du 06/08).
+    page = pageEffective(pageDemandee, totalSelection, TAILLE_PAGE);
+    if (page !== pageDemandee) {
+      selection = await listerMesures({
+        filtres: filtresRequete,
+        limite: TAILLE_PAGE,
+        offset: (page - 1) * TAILLE_PAGE,
+      });
+    }
+    mesures = selection.lignes;
   } catch (err) {
     console.error("[donnees] lecture impossible", err);
     return (
@@ -126,6 +193,18 @@ export default async function Donnees() {
   const maintenant = Date.now();
   const totalMesures = inventaire.reduce((somme, l) => somme + l.nbMesures, 0);
   const retention = retentionRawJours();
+  const pages = Math.max(1, Math.ceil(totalSelection / TAILLE_PAGE));
+  // Les sélecteurs reflètent le filtre RÉELLEMENT appliqué : une valeur d'URL absente des
+  // options connues y est AJOUTÉE — sinon le navigateur retombe sur « Toutes » pendant
+  // que la table, elle, filtre (revue du 06/08).
+  const metriquesConnues = [...new Set(inventaire.map((l) => l.metricType))].sort();
+  if (filtresUrl.metrique && !metriquesConnues.includes(filtresUrl.metrique)) {
+    metriquesConnues.push(filtresUrl.metrique);
+  }
+  const sourcesConnues = [...new Set(inventaire.map((l) => l.source))].sort();
+  if (filtresUrl.source && !sourcesConnues.includes(filtresUrl.source)) {
+    sourcesConnues.push(filtresUrl.source);
+  }
 
   // « Livraisons récentes mais plus AUCUNE écriture » : la panne muette par excellence.
   // Le bandeau de couverture est cumulatif à vie — un flux qui a cessé d'écrire y reste
@@ -243,10 +322,53 @@ export default async function Donnees() {
         </>
       )}
 
-      {/* ── TOUTES LES DERNIÈRES MESURES, ligne par ligne ───────────────────────────── */}
-      {mesures.length > 0 && (
+      {/* ── LE TABLEAU : toutes les mesures, filtrables, paginées, exportables ──────── */}
+      <h2>Mesures ({totalSelection.toLocaleString("fr-CA")} dans la sélection)</h2>
+
+      <form method="get" className="filtres">
+        <label>
+          Métrique{" "}
+          <select name="metrique" defaultValue={filtresUrl.metrique ?? ""}>
+            <option value="">Toutes</option>
+            {metriquesConnues.map((m) => (
+              <option key={m} value={m}>
+                {libelle(m)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Source{" "}
+          <select name="source" defaultValue={filtresUrl.source ?? ""}>
+            <option value="">Toutes</option>
+            {sourcesConnues.map((s) => (
+              <option key={s} value={s}>
+                {nomSource(s)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Période{" "}
+          <select name="periode" defaultValue={filtresUrl.periode}>
+            {(Object.keys(PERIODES) as Periode[]).map((p) => (
+              <option key={p} value={p}>
+                {p === "tout" ? "Tout l’historique" : p}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button type="submit">Filtrer</button>
+        <a href={`/api/donnees/export${queryFiltres(filtresUrl)}`}>
+          Exporter la sélection en CSV
+        </a>
+        <a href="/api/donnees/export">Exporter TOUTE la base en CSV</a>
+      </form>
+
+      {totalSelection === 0 ? (
+        <p className="hint">Aucune mesure ne correspond à ces filtres.</p>
+      ) : (
         <>
-          <h2>Dernières mesures enregistrées ({mesures.length} plus récentes)</h2>
           <div className="defilement">
             <table className="tableau">
               <thead>
@@ -254,6 +376,7 @@ export default async function Donnees() {
                   <th scope="col">Mesurée</th>
                   <th scope="col">Métrique</th>
                   <th scope="col">Valeur</th>
+                  <th scope="col">Unité</th>
                   <th scope="col">Statut</th>
                   <th scope="col">Source</th>
                 </tr>
@@ -271,7 +394,8 @@ export default async function Donnees() {
                         </>
                       ) : null}
                     </td>
-                    <td className="nombre">{valeurBrute(m)}</td>
+                    <td className="nombre">{valeurAffichable(m)}</td>
+                    <td>{m.unit ?? "—"}</td>
                     <td>{m.signalStatus ?? "—"}</td>
                     <td>{nomSource(m.source)}</td>
                   </tr>
@@ -279,11 +403,22 @@ export default async function Donnees() {
               </tbody>
             </table>
           </div>
+
           <p className="hint">
-            Fenêtre bornée aux {mesures.length} mesures les plus récentes — l’historique
-            complet reste en base (rien n’est purgé côté mesures) et se consultera par
-            métrique avec les graphiques à venir. Une position GPS s’affiche « détail en
-            base », jamais en coordonnées.
+            Page {page} sur {pages} — lignes{" "}
+            {((page - 1) * TAILLE_PAGE + 1).toLocaleString("fr-CA")} à{" "}
+            {Math.min(page * TAILLE_PAGE, totalSelection).toLocaleString("fr-CA")} sur{" "}
+            {totalSelection.toLocaleString("fr-CA")}.{" "}
+            {page > 1 && (
+              <a href={`/donnees${queryFiltres(filtresUrl, page - 1)}`}>← Précédente</a>
+            )}{" "}
+            {page < pages && (
+              <a href={`/donnees${queryFiltres(filtresUrl, page + 1)}`}>Suivante →</a>
+            )}
+            <br />
+            L’écran pagine ; l’export CSV, lui, livre TOUTE la sélection d’un coup — c’est
+            le chemin « récupérer toutes mes données ». Une position GPS ne s’affiche pas à
+            l’écran ; ses coordonnées sont dans l’export.
           </p>
         </>
       )}

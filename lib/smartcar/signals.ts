@@ -43,6 +43,13 @@ export interface SignalNormalise {
   groupe: string;
   nom: string;
   valeur: unknown;
+  /**
+   * Champs FRÈRES de `value` dans le corps (hors `unit`) : `tractionbattery-range` livre
+   * `{ value, type, additionalValues }` — jeter les frères perdait l'autonomie par mode de
+   * conduite sans erreur, et la purge du raw effaçait ensuite la seule copie (revue du
+   * 06/08/2026). `null` quand le corps ne porte rien de plus.
+   */
+  complement: Record<string, unknown> | null;
   unite: string | null;
   /** Instant où le VÉHICULE a produit la mesure, si la source le dit. */
   oemUpdatedAt: Date | null;
@@ -111,11 +118,49 @@ export const CORRESPONDANCE_EXACTE: Readonly<Record<string, MetricType>> = {
   // ⚠️ JAMAIS deux codes vers la MÊME métrique : s'ils arrivaient au même horodatage, le
   // second serait écarté par l'index unique comme un doublon — la collision exacte que le
   // correctif du 06/08 (#10) a retirée du repli par groupe. Deux capacités distinctes chez
-  // la source restent deux métriques distinctes chez nous.
+  // la source restent deux métriques distinctes chez nous. (Verrouillé par test.)
   "tractionbattery-capacity": "battery_capacity",
   "tractionbattery-nominalcapacity": "battery_capacity_nominal",
   "charge-chargelimit": "charge_limit",
   "lowvoltagebattery-stateofcharge": "low_voltage_battery",
+
+  // — Souscription élargie du 06/08/2026 (84 signaux) : codes vus dans la livraison TEST
+  // de validation. Chacun sa métrique ; leur statut réel sur la bZ se lira dans les
+  // livraisons LIVE (SUCCESS → candidats à SIGNAUX_CONFIRMES_BZ, sinon VEHICLE_ERROR tracé).
+  "climate-externaltemperature": "outside_temperature",
+  "climate-internaltemperature": "inside_temperature",
+  "charge-amperage": "charge_amperage",
+  "charge-amperagemax": "charge_amperage_max",
+  "charge-amperagerequested": "charge_amperage_requested",
+  "charge-voltage": "charge_voltage",
+  "charge-wattage": "charge_wattage",
+  "charge-chargerate": "charge_rate",
+  "charge-energyadded": "charge_energy_added",
+  "charge-chargelimits": "charge_limits",
+  "charge-chargeportstatuscolor": "charge_port_color",
+  "charge-chargerecords": "charge_records",
+  "charge-chargerphases": "charger_phases",
+  "charge-chargingconnectortype": "charge_connector_type",
+  "charge-fastchargertype": "fast_charger_type",
+  "charge-ischargingcablelatched": "charge_cable_latched",
+  "charge-isfastchargerpresent": "fast_charger_present",
+  "hvac-cabintargettemperature": "hvac_target_temperature",
+  "hvac-iscabinhvacactive": "hvac_active",
+  "hvac-isfrontdefrosteractive": "defroster_front",
+  "hvac-isreardefrosteractive": "defroster_rear",
+  "hvac-issteeringheateractive": "steering_heater",
+  "location-isathome": "at_home",
+  "lowvoltagebattery-status": "low_voltage_battery_status",
+  "transmission-drivemode": "drive_mode",
+  "transmission-gearstate": "gear_state",
+  "service-isinservice": "in_service",
+  "surveillance-isenabled": "surveillance_enabled",
+  "tractionbattery-isheateractive": "battery_heater",
+  "tractionbattery-maxrangechargecounter": "max_range_charge_counter",
+  // `frunk_status` appartient à closure-enginecover (confirmé sur la bZ) : le coffre
+  // avant « fronttrunk » du catalogue TEST reste une métrique distincte.
+  "closure-fronttrunk": "front_trunk_status",
+  "closure-tailgate": "tailgate_status",
 };
 
 /**
@@ -170,10 +215,13 @@ export const CORRESPONDANCE_GROUPE: Readonly<Record<string, MetricType>> = {
 };
 
 /**
- * Groupes SANS objet pour un véhicule électrique (Doc 2 §4.1). Ils ne sont jamais demandés,
- * et s'ils arrivaient quand même ils seraient stockés en brut plutôt que mal rangés.
+ * Groupes SANS objet pour un véhicule électrique (Doc 2 §4.1). Purement documentaire —
+ * rien n'est bloqué à l'écriture : un signal de ces groupes qui arriverait quand même est
+ * stocké comme les autres. `transmission` en a été RETIRÉ le 06/08 : la livraison TEST de
+ * la souscription élargie montre `gearstate`/`drivemode`, pertinents même sur une
+ * électrique (position P/R/N/D, mode de conduite).
  */
-export const GROUPES_HORS_SUJET = new Set(["internalcombustionengine", "transmission"]);
+export const GROUPES_HORS_SUJET = new Set(["internalcombustionengine"]);
 
 function objet(valeur: unknown): Record<string, unknown> | null {
   return valeur && typeof valeur === "object" && !Array.isArray(valeur)
@@ -249,26 +297,51 @@ export function normaliserSignal(brut: SignalBrut): SignalNormalise | null {
   const nom =
     chaine(brut.name) ?? chaine(attrs.name) ?? codeMinuscule.split("-").slice(1).join("-");
 
+  const statutTexte = chaine(statut.value) ?? chaine(brut.status);
+  const corpsSansUnite = Object.fromEntries(
+    Object.entries(body).filter(([cle]) => cle !== "unit"),
+  );
+
   // `body.values` au PLURIEL pour les signaux à valeurs multiples (permissions du compte,
   // par exemple). L'ignorer écrirait une ligne vide là où une liste existe.
-  const valeur =
-    "value" in body
-      ? body.value
-      : "values" in body
-        ? body.values
-        : "value" in brut
-          ? brut.value
-          : (attrs.value ?? null);
+  //
+  // À défaut des DEUX : le corps ENTIER, s'il porte autre chose que l'unité. Vu sur le
+  // catalogue réel du 06/08/2026 : `closure-enginecover` répond `body: { isOpen: false }`
+  // — ni `value` ni `values`. La première version écrivait « non communiqué » pour un
+  // capot dont l'état était là, sous nos yeux.
+  //
+  // ⚠️ SAUF quand le statut dit « pas de valeur » : un `UNKNOWN` peut laisser traîner des
+  // restes STRUCTURELS (`{ type: "DEFAULT", additionalValues: [] }`) — les stocker
+  // fabriquerait une valeur là où la vérité est « la source a répondu sans valeur »
+  // (revue du 06/08/2026, prouvé par sonde).
+  let valeur: unknown = null;
+  let complement: Record<string, unknown> | null = null;
+  if ("value" in body || "values" in body) {
+    const clePrincipale = "value" in body ? "value" : "values";
+    valeur = body[clePrincipale];
+    const freres = Object.fromEntries(
+      Object.entries(corpsSansUnite).filter(([cle]) => cle !== clePrincipale),
+    );
+    if (Object.keys(freres).length > 0) complement = freres;
+  } else if (
+    Object.keys(corpsSansUnite).length > 0 &&
+    (!statutTexte || statutTexte === "SUCCESS")
+  ) {
+    valeur = corpsSansUnite;
+  } else {
+    valeur = "value" in brut ? brut.value : (attrs.value ?? null);
+  }
 
   return {
     code: codeMinuscule,
     groupe,
     nom,
     valeur,
+    complement,
     unite: chaine(body.unit) ?? chaine(attrs.unit),
     // `SUCCESS` quand le véhicule a répondu. Autre chose signale une donnée que l'OEM n'a
     // pas pu fournir cette fois-ci — à distinguer d'une absence pure.
-    statut: chaine(statut.value) ?? chaine(brut.status),
+    statut: statutTexte,
     oemUpdatedAt: dateOuNull(meta.oemUpdatedAt ?? meta.oemUpdatedTime),
     retrievedAt: dateOuNull(meta.retrievedAt ?? meta.retrievedTime ?? meta.ingestedTime),
   };
@@ -337,6 +410,32 @@ export function signalVersSnapshot(
   const metricType = metriquePourSignal(signal.code, signal.groupe);
   const recordedAt = signal.oemUpdatedAt ?? signal.retrievedAt ?? options.recuLe;
 
+  // La position porte SON type dans son corps (`locationType: "LAST_PARKED"` — catalogue
+  // réel du 06/08/2026). « Où est la voiture » et « où elle s'est GARÉE il y a 19 h »
+  // ne sont pas la même information : sans cette distinction, l'écran laisserait croire
+  // à une position temps réel (Doc 3 §3).
+  //
+  // ⚠️ Le repli `options.locationType` ne s'applique qu'aux mesures qui SONT des
+  // positions : appliqué au lot entier d'un poll Toyota, il étiquetait « dernier
+  // stationnement » un relevé d'odomètre — et `locationType` non nul est justement un des
+  // signaux de la garde d'affichage GPS (revue du 06/08/2026).
+  const corps = objet(signal.valeur);
+  const typePosition = chaine(corps?.locationType)?.toUpperCase();
+  const estMesureDePosition =
+    metricType === "location" ||
+    signal.code.startsWith("location") ||
+    typePosition !== undefined;
+  const locationType: LocationType | null =
+    typePosition === "LAST_PARKED"
+      ? "last_parked"
+      : // `REAL_TIME` (Doc 3 §3) et `CURRENT` (vu dans la livraison TEST du 06/08) disent
+        // la même chose : la position au moment de la mesure, pas un stationnement.
+        typePosition === "REAL_TIME" || typePosition === "CURRENT"
+        ? "real_time"
+        : estMesureDePosition
+          ? (options.locationType ?? null)
+          : null;
+
   const base: NouveauSnapshot = {
     recordedAt,
     receivedAt: options.recuLe,
@@ -351,19 +450,29 @@ export function signalVersSnapshot(
     valueNumeric: null,
     valueText: null,
     valueJson: null,
-    locationType: options.locationType ?? null,
+    locationType,
   };
 
+  // Les champs FRÈRES du corps accompagnent la valeur scalaire dans `value_json` : jeter
+  // le `additionalValues` de l'autonomie perdait des données que la source livrait, et la
+  // purge du raw effaçait ensuite la seule copie (revue du 06/08/2026).
+  const complement = signal.complement as NouveauSnapshot["valueJson"];
+
   if (estNombreFini(signal.valeur)) {
-    return { ...base, valueNumeric: signal.valeur };
+    return { ...base, valueNumeric: signal.valeur, valueJson: complement ?? null };
   }
   if (typeof signal.valeur === "string") {
-    return { ...base, valueText: signal.valeur };
+    return { ...base, valueText: signal.valeur, valueJson: complement ?? null };
   }
   if (typeof signal.valeur === "boolean") {
     // Stocké dans les DEUX colonnes : le texte reste lisible à l'œil dans la base, le
     // numérique rend le signal traçable sur un graphique (branché / débranché).
-    return { ...base, valueText: String(signal.valeur), valueNumeric: signal.valeur ? 1 : 0 };
+    return {
+      ...base,
+      valueText: String(signal.valeur),
+      valueNumeric: signal.valeur ? 1 : 0,
+      valueJson: complement ?? null,
+    };
   }
   if (signal.valeur !== null && signal.valeur !== undefined) {
     // Objet ou tableau : position GPS, pressions des quatre pneus, statut par portière.
