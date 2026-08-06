@@ -111,11 +111,49 @@ export const CORRESPONDANCE_EXACTE: Readonly<Record<string, MetricType>> = {
   // ⚠️ JAMAIS deux codes vers la MÊME métrique : s'ils arrivaient au même horodatage, le
   // second serait écarté par l'index unique comme un doublon — la collision exacte que le
   // correctif du 06/08 (#10) a retirée du repli par groupe. Deux capacités distinctes chez
-  // la source restent deux métriques distinctes chez nous.
+  // la source restent deux métriques distinctes chez nous. (Verrouillé par test.)
   "tractionbattery-capacity": "battery_capacity",
   "tractionbattery-nominalcapacity": "battery_capacity_nominal",
   "charge-chargelimit": "charge_limit",
   "lowvoltagebattery-stateofcharge": "low_voltage_battery",
+
+  // — Souscription élargie du 06/08/2026 (84 signaux) : codes vus dans la livraison TEST
+  // de validation. Chacun sa métrique ; leur statut réel sur la bZ se lira dans les
+  // livraisons LIVE (SUCCESS → candidats à SIGNAUX_CONFIRMES_BZ, sinon VEHICLE_ERROR tracé).
+  "climate-externaltemperature": "outside_temperature",
+  "climate-internaltemperature": "inside_temperature",
+  "charge-amperage": "charge_amperage",
+  "charge-amperagemax": "charge_amperage_max",
+  "charge-amperagerequested": "charge_amperage_requested",
+  "charge-voltage": "charge_voltage",
+  "charge-wattage": "charge_wattage",
+  "charge-chargerate": "charge_rate",
+  "charge-energyadded": "charge_energy_added",
+  "charge-chargelimits": "charge_limits",
+  "charge-chargeportstatuscolor": "charge_port_color",
+  "charge-chargerecords": "charge_records",
+  "charge-chargerphases": "charger_phases",
+  "charge-chargingconnectortype": "charge_connector_type",
+  "charge-fastchargertype": "fast_charger_type",
+  "charge-ischargingcablelatched": "charge_cable_latched",
+  "charge-isfastchargerpresent": "fast_charger_present",
+  "hvac-cabintargettemperature": "hvac_target_temperature",
+  "hvac-iscabinhvacactive": "hvac_active",
+  "hvac-isfrontdefrosteractive": "defroster_front",
+  "hvac-isreardefrosteractive": "defroster_rear",
+  "hvac-issteeringheateractive": "steering_heater",
+  "location-isathome": "at_home",
+  "lowvoltagebattery-status": "low_voltage_battery_status",
+  "transmission-drivemode": "drive_mode",
+  "transmission-gearstate": "gear_state",
+  "service-isinservice": "in_service",
+  "surveillance-isenabled": "surveillance_enabled",
+  "tractionbattery-isheateractive": "battery_heater",
+  "tractionbattery-maxrangechargecounter": "max_range_charge_counter",
+  // `frunk_status` appartient à closure-enginecover (confirmé sur la bZ) : le coffre
+  // avant « fronttrunk » du catalogue TEST reste une métrique distincte.
+  "closure-fronttrunk": "front_trunk_status",
+  "closure-tailgate": "tailgate_status",
 };
 
 /**
@@ -170,10 +208,13 @@ export const CORRESPONDANCE_GROUPE: Readonly<Record<string, MetricType>> = {
 };
 
 /**
- * Groupes SANS objet pour un véhicule électrique (Doc 2 §4.1). Ils ne sont jamais demandés,
- * et s'ils arrivaient quand même ils seraient stockés en brut plutôt que mal rangés.
+ * Groupes SANS objet pour un véhicule électrique (Doc 2 §4.1). Purement documentaire —
+ * rien n'est bloqué à l'écriture : un signal de ces groupes qui arriverait quand même est
+ * stocké comme les autres. `transmission` en a été RETIRÉ le 06/08 : la livraison TEST de
+ * la souscription élargie montre `gearstate`/`drivemode`, pertinents même sur une
+ * électrique (position P/R/N/D, mode de conduite).
  */
-export const GROUPES_HORS_SUJET = new Set(["internalcombustionengine", "transmission"]);
+export const GROUPES_HORS_SUJET = new Set(["internalcombustionengine"]);
 
 function objet(valeur: unknown): Record<string, unknown> | null {
   return valeur && typeof valeur === "object" && !Array.isArray(valeur)
@@ -356,7 +397,9 @@ export function signalVersSnapshot(
   const locationType: LocationType | null =
     typePosition === "LAST_PARKED"
       ? "last_parked"
-      : typePosition === "REAL_TIME"
+      : // `REAL_TIME` (Doc 3 §3) et `CURRENT` (vu dans la livraison TEST du 06/08) disent
+        // la même chose : la position au moment de la mesure, pas un stationnement.
+        typePosition === "REAL_TIME" || typePosition === "CURRENT"
         ? "real_time"
         : (options.locationType ?? null);
 

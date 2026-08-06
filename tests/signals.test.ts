@@ -284,6 +284,37 @@ describe("formes RÉELLES du catalogue de signaux (06/08/2026, bZ live)", () => 
     expect(ligne.valueJson).toMatchObject({ latitude: 46.157352 });
   });
 
+  it("souscription élargie (TEST du 06/08) : diagnostics {status}, CURRENT, températures", () => {
+    // `diagnostics-abs` répond `body: { status: "OK", description: "" }` — encore un corps
+    // sans value/values. Le repli « corps entier » le conserve.
+    const diag = normaliserSignal({
+      code: "diagnostics-abs",
+      body: { status: "OK", description: "" },
+      status: { value: "SUCCESS" },
+    });
+    const ligneDiag = signalVersSnapshot(diag!, { source: "smartcar", recuLe: RECU_LE });
+    expect(ligneDiag.valueJson).toEqual({ status: "OK", description: "" });
+
+    // `locationType: "CURRENT"` (livraison TEST) = position au moment de la mesure.
+    const position = normaliserSignal({
+      code: "location-preciselocation",
+      body: { latitude: 51.5, longitude: -0.14, locationType: "CURRENT" },
+    });
+    expect(
+      signalVersSnapshot(position!, { source: "smartcar", recuLe: RECU_LE }).locationType,
+    ).toBe("real_time");
+
+    // Les températures ont leur métrique et leur unité déclarée.
+    const temp = normaliserSignal({
+      code: "climate-externaltemperature",
+      body: { value: 14.5, unit: "celsius" },
+    });
+    const ligneTemp = signalVersSnapshot(temp!, { source: "smartcar", recuLe: RECU_LE });
+    expect(ligneTemp.metricType).toBe("outside_temperature");
+    expect(ligneTemp.valueNumeric).toBe(14.5);
+    expect(ligneTemp.unit).toBe("celsius");
+  });
+
   it("REAL_TIME est reconnu aussi, et un corps à `value` garde le chemin nominal", () => {
     const tempsReel = normaliserSignal({
       code: "location-preciselocation",
