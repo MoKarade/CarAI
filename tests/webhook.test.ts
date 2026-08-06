@@ -215,3 +215,33 @@ describe("challengeBienForme — ferme l'oracle de signature", () => {
     expect(challengeBienForme(`challenge_${"a".repeat(129)}`)).toBe(false);
   });
 });
+
+// ── Permissions du Connect ─────────────────────────────────────────────────────────
+// Deux signaux de la bZ échouent en PERMISSION. Les débloquer suppose de connaître le nom
+// exact de leur scope, invérifiable depuis ces sessions — et un scope invalide casse le
+// Connect ENTIER. D'où une liste par défaut figée (celle qui marche) et un ajout par
+// l'environnement, réversible en vidant la variable.
+describe("permissions demandées au Connect", () => {
+  it("sans variable, la liste reste EXACTEMENT celle qui fonctionne", async () => {
+    const { permissionsDemandees, PERMISSIONS } = await import("@/lib/smartcar/connect");
+    expect(permissionsDemandees({})).toEqual([...PERMISSIONS]);
+  });
+
+  it("ajoute les scopes fournis, en acceptant virgules ou espaces", async () => {
+    const { permissionsDemandees } = await import("@/lib/smartcar/connect");
+    const p = permissionsDemandees({ SMARTCAR_SCOPES_EXTRA: "read_vin, read_speed" });
+    expect(p).toContain("read_vin");
+    expect(p).toContain("read_speed");
+  });
+
+  it("ne duplique jamais un scope déjà demandé", async () => {
+    const { permissionsDemandees } = await import("@/lib/smartcar/connect");
+    const p = permissionsDemandees({ SMARTCAR_SCOPES_EXTRA: "read_battery read_vin" });
+    expect(p.filter((s) => s === "read_battery")).toHaveLength(1);
+  });
+
+  it("ignore une valeur vide ou en espaces plutôt que d'envoyer un scope vide", async () => {
+    const { permissionsDemandees, PERMISSIONS } = await import("@/lib/smartcar/connect");
+    expect(permissionsDemandees({ SMARTCAR_SCOPES_EXTRA: "  ,  " })).toEqual([...PERMISSIONS]);
+  });
+});

@@ -27,6 +27,43 @@ export const PERMISSIONS = [
   "read_service_history",
 ] as const;
 
+/**
+ * Permissions SUPPLÉMENTAIRES, ajoutées par l'environnement (`SMARTCAR_SCOPES_EXTRA`,
+ * séparées par des virgules ou des espaces).
+ *
+ * ══ POURQUOI CONFIGURABLE PLUTÔT QU'ÉCRIT EN DUR ════════════════════════════════════
+ * Le rapport de signaux de la bZ (06/08/2026) montre deux données que le véhicule SAIT
+ * fournir mais que l'autorisation ne couvre pas : `Motion.CurrentSpeed` et
+ * `VehicleIdentification.VIN`, tous deux en erreur `PERMISSION`.
+ *
+ * Les ajouter suppose de connaître le NOM EXACT de leur scope. La doc Smartcar reste
+ * inaccessible depuis ces sessions, et un scope invalide fait échouer le Connect EN ENTIER
+ * — exactement comme le `client_id` ce matin. Écrire `read_speed` de mémoire risquerait de
+ * casser une autorisation qui fonctionne, pour une donnée secondaire.
+ *
+ * D'où le même choix que pour `SMARTCAR_CONNECT_CLIENT_ID` : la liste par défaut reste
+ * celle qui MARCHE, et tout ajout se tente sans toucher au code. Si le Connect échoue sur
+ * un scope inconnu, vider la variable ramène à l'état fonctionnel.
+ *
+ * ⚠️ Moindre privilège : ne demander que ce qu'on utilise réellement. Une permission
+ * accordée « au cas où » est une permission qu'on oublie d'avoir donnée.
+ */
+export function permissionsSupplementaires(
+  env: Record<string, string | undefined> = process.env,
+): string[] {
+  return (env.SMARTCAR_SCOPES_EXTRA ?? "")
+    .split(/[,\s]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/** Permissions effectivement demandées au Connect, sans doublon. */
+export function permissionsDemandees(
+  env: Record<string, string | undefined> = process.env,
+): string[] {
+  return [...new Set<string>([...PERMISSIONS, ...permissionsSupplementaires(env)])];
+}
+
 /** Erreurs que le Connect peut renvoyer (Doc 2 §3.4), traduites pour Marc. */
 export const MESSAGES_ERREUR_CONNECT: Readonly<Record<string, string>> = {
   access_denied: "Autorisation refusée. Le véhicule n'a pas été connecté.",
@@ -59,6 +96,8 @@ export function construireUrlConnect(params: {
   state: string;
   mode?: "live" | "test" | "simulated";
   singleSelect?: boolean;
+  /** Permissions à demander. Par défaut celles de `permissionsDemandees()`. */
+  scopes?: readonly string[];
 }): string {
   const { clientId, redirectUri, state, mode = "live", singleSelect = true } = params;
 
@@ -66,7 +105,7 @@ export function construireUrlConnect(params: {
     response_type: "code",
     client_id: clientId,
     redirect_uri: redirectUri,
-    scope: PERMISSIONS.join(" "),
+    scope: (params.scopes ?? permissionsDemandees()).join(" "),
     state,
     mode,
   });
