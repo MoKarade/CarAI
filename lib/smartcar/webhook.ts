@@ -231,6 +231,63 @@ export function challengeBienForme(valeur: string): boolean {
  * Le seuil par défaut (6 h) est délibérément lâche : il vaut mieux une alerte tardive et
  * sûre qu'une alerte qui crie à chaque nuit où la voiture n'a pas bougé.
  */
+/**
+ * Résume un `VEHICLE_ERROR` en lignes lisibles.
+ *
+ * ══ POURQUOI CE RÉSUMÉ MÉRITE DU CODE ═══════════════════════════════════════════════
+ * Un `VEHICLE_ERROR` porte l'information la PLUS actionnable du pipeline : la liste des
+ * signaux que le véhicule REFUSE, et pourquoi. C'est elle qui dit quoi retirer de la
+ * souscription.
+ *
+ * Vécu le 06/08/2026 : sur onze signaux souscrits, HUIT étaient refusés par la bZ —
+ * sept en `VEHICLE_NOT_CAPABLE` (des signaux propres au véhicule de démonstration Tesla)
+ * et un en `PERMISSION` pour un niveau de CARBURANT, sur une voiture électrique. Cette
+ * information existait déjà, noyée dans une trentaine de lignes de JSON.
+ *
+ * Les deux causes appellent des gestes OPPOSÉS, d'où leur distinction explicite :
+ *   • `COMPATIBILITY` → le véhicule ne SAIT PAS. Retirer le signal ; réessayer est vain.
+ *   • `PERMISSION` → la permission manque. Refaire le Connect peut régler le cas.
+ */
+export function resumerErreursVehicule(charge: unknown): string[] {
+  const racine =
+    charge && typeof charge === "object" ? (charge as Record<string, unknown>) : {};
+  const donnees =
+    racine.data && typeof racine.data === "object"
+      ? (racine.data as Record<string, unknown>)
+      : {};
+
+  const erreurs = Array.isArray(donnees.errors) ? donnees.errors : [];
+  if (erreurs.length === 0) return ["VEHICLE_ERROR sans détail d'erreur exploitable."];
+
+  const lignes: string[] = [];
+  for (const brute of erreurs) {
+    if (!brute || typeof brute !== "object") continue;
+    const e = brute as Record<string, unknown>;
+
+    const type = typeof e.type === "string" ? e.type : "INCONNU";
+    const codes = (Array.isArray(e.signals) ? e.signals : [])
+      .map((s) => (s && typeof s === "object" ? (s as Record<string, unknown>).code : null))
+      .filter((c): c is string => typeof c === "string");
+
+    const resolution =
+      e.resolution && typeof e.resolution === "object"
+        ? (e.resolution as Record<string, unknown>).type
+        : null;
+
+    const conseil =
+      type === "COMPATIBILITY"
+        ? "le véhicule NE SAIT PAS fournir ces signaux — les retirer de la souscription, réessayer ne servira à rien"
+        : resolution === "REAUTHENTICATE"
+          ? "permission manquante — refaire le Connect en cochant les permissions concernées"
+          : "voir le JSON brut";
+
+    lignes.push(
+      `${type} sur ${codes.length} signal(aux) : ${codes.join(", ") || "(non précisés)"} → ${conseil}`,
+    );
+  }
+  return lignes;
+}
+
 export function silenceWebhook(params: {
   derniereLivraison: Date | null;
   maintenant: Date;
