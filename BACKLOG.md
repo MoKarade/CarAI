@@ -18,11 +18,6 @@ Voir `HANDOVER.md` pour la marche à suivre détaillée.
 
 ## À faire dès que des données réelles arrivent
 
-- [ ] `[SC-05]` **Confirmer la couverture 15/15 sur quelques heures de livraisons.**
-      La livraison de 13:33 portait 11 signaux : soit Smartcar livre par lots, soit le
-      ménage de Marc a retiré un signal fonctionnel. Trancher avec les journaux Vercel
-      (les codes y sont maintenant listés) et la page `/donnees` (les manquants y sont
-      nommés). Si un des 15 ne se présente jamais : vérifier la souscription du webhook.
 - [ ] `[SC-03]` Confirmer que les commandes de sécurité répondent bien en V3
       (`lib/smartcar/commands.ts` → `CHEMINS_COMMANDES`). Le cadrage signalait que la doc
       mentionnait encore V2.0 pour cet endpoint. Si 404/501, corriger la table — c'est une
@@ -76,6 +71,11 @@ Voir `HANDOVER.md` pour la marche à suivre détaillée.
 
 ## Livré
 
+- [x] `[SC-05]` Couverture confirmée sur du réel : les 15 signaux étaient tous `SUCCESS`
+      au catalogue, mais la souscription du WEBHOOK ne portait que les 11 d'origine
+      (3 utiles + 8 morts) — Marc l'a élargie à 84 signaux (clim, températures, ampérage,
+      HVAC, diagnostics…). Première livraison LIVE élargie : 84 reçus / 84 écrits
+      (15:33 UTC). Les statuts par signal (`signal_status`) diront ce que la bZ refuse — 2026-08-06
 - [x] `[INFRA-01..06]` Base Neon, Vercel + domaine, OAuth Google, identifiants Smartcar,
       webhook vérifié, Connect réussi — 2026-08-05/06 (données réelles en base)
 - [x] `[SC-01]` Mapping confronté au réel : structure de livraison alignée (PR #9),
