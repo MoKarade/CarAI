@@ -17,9 +17,9 @@
 // elle vient d'une source non officielle, et confondre les deux serait leur prêter la même
 // fiabilité.
 
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { collecter } from "@/lib/vehicle/instantane";
+import { Onglets } from "@/app/ui/Onglets";
 import { formaterAge, formaterValeur, libelle, nomSource } from "@/lib/vehicle/state";
 import { resumerBail } from "@/lib/vehicle/lease";
 import { messagePanne } from "@/lib/panne";
@@ -34,6 +34,7 @@ function Coquille({ titre, children }: { titre: string; children: React.ReactNod
       <div className="card">
         <p className="eyebrow">hubperso.com · CarAI</p>
         <h1>{titre}</h1>
+        <Onglets actif="/" />
         {children}
       </div>
     </main>
@@ -125,10 +126,6 @@ export default async function Home() {
         </p>
       )}
 
-      <p className="hint">
-        <Link href="/donnees">Inventaire des données</Link> — couverture des signaux,
-        historique des livraisons, volume conservé.
-      </p>
     </Coquille>
   );
 }

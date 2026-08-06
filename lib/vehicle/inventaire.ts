@@ -97,6 +97,67 @@ export async function journalLivraisons(
   }));
 }
 
+/** Une mesure individuelle, telle qu'en base — pour l'affichage « toutes les données ». */
+export interface MesureBrute {
+  id: number;
+  recordedAt: Date;
+  receivedAt: Date;
+  source: string;
+  metricType: string;
+  signalCode: string | null;
+  signalStatus: string | null;
+  valueNumeric: number | null;
+  valueText: string | null;
+  /** Présence seulement : le CONTENU d'un `value_json` (position GPS…) ne sort pas d'ici. */
+  aDetailJson: boolean;
+  unit: string | null;
+}
+
+/**
+ * Les dernières mesures, toutes métriques confondues, plus récentes d'abord.
+ *
+ * BORNÉE (`limite`) et fenêtrée en QUEUE de table : sur une table conçue pour croître des
+ * années sans purge, une lecture non bornée finirait par figer la page — et une borne de
+ * TÊTE cesserait de voir le neuf (leçon DriveAI C28-34). L'historique complet se
+ * consultera par métrique via les graphiques (`[UI-01]`), pas par une page qui liste tout.
+ */
+export async function dernieresMesures(
+  limite = 200,
+  dbx: Dbx = db,
+): Promise<MesureBrute[]> {
+  const resultat = await dbx.execute(sql`
+    SELECT
+      id,
+      recorded_at   AS "recordedAt",
+      received_at   AS "receivedAt",
+      source,
+      metric_type   AS "metricType",
+      signal_code   AS "signalCode",
+      signal_status AS "signalStatus",
+      value_numeric AS "valueNumeric",
+      value_text    AS "valueText",
+      (value_json IS NOT NULL) AS "aDetailJson",
+      unit
+    FROM vehicle_snapshots
+    ORDER BY recorded_at DESC, id DESC
+    LIMIT ${limite}
+  `);
+
+  const lignes = ((resultat as { rows?: unknown[] }).rows ??
+    (Array.isArray(resultat) ? resultat : [])) as Array<
+    Omit<MesureBrute, "recordedAt" | "receivedAt"> & {
+      recordedAt: Date | string;
+      receivedAt: Date | string;
+    }
+  >;
+
+  return lignes.map((l) => ({
+    ...l,
+    recordedAt: l.recordedAt instanceof Date ? l.recordedAt : new Date(l.recordedAt),
+    receivedAt: l.receivedAt instanceof Date ? l.receivedAt : new Date(l.receivedAt),
+  }));
+}
+
 /** Verdict de couverture : la base contre la liste des signaux confirmés. */
 export interface BilanCouverture {
   /** Signaux confirmés dont AU MOINS une mesure est en base. */
