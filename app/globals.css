@@ -120,3 +120,40 @@ code {
   color: var(--text-soft);
   font-size: 0.8rem;
 }
+
+/* Page /donnees : l'inventaire est un TABLEAU, il lui faut plus de largeur que la carte
+   du tableau de bord. Le contenu large défile dans son conteneur, jamais la page. */
+.card-large {
+  max-width: 56rem;
+  width: 100%;
+}
+.card h2 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 1.4rem 0 0.5rem;
+}
+.defilement {
+  overflow-x: auto;
+}
+.tableau {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+.tableau th,
+.tableau td {
+  text-align: left;
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.tableau th {
+  color: var(--text-soft);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.tableau .nombre {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

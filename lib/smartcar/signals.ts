@@ -115,6 +115,36 @@ export const CORRESPONDANCE_EXACTE: Readonly<Record<string, MetricType>> = {
 };
 
 /**
+ * Les signaux que la bZ de Marc a CONFIRMÉS en `SUCCESS` (rapport du 06/08/2026).
+ *
+ * C'est la LISTE DE RÉFÉRENCE de la couverture : la page /donnees compare ce que la base
+ * contient à cette liste, et nomme ce qui manque. Sans elle, « vérifier qu'on reçoit tout »
+ * n'a pas de définition — on ne peut pas voir l'absence d'une donnée qu'on n'attend pas.
+ *
+ * ⚠️ Ne PAS y ajouter un code non confirmé : un signal jamais observé en SUCCESS afficherait
+ * « manquant » en permanence, et l'indicateur perdrait son sens (même piège que la revue
+ * saturée de DriveAI). Si un nouveau signal passe SUCCESS un jour (ex. `motion-currentspeed`
+ * après un Connect élargi), l'ajouter ICI dans le même commit.
+ */
+export const SIGNAUX_CONFIRMES_BZ: readonly string[] = [
+  "tractionbattery-stateofcharge",
+  "tractionbattery-range",
+  "odometer-traveleddistance",
+  "location-preciselocation",
+  "wheel-tires",
+  "closure-islocked",
+  "closure-doors",
+  "closure-windows",
+  "closure-enginecover",
+  "charge-ischarging",
+  "charge-detailedchargingstatus",
+  "charge-ischargingcableconnected",
+  "charge-ischargingportflapopen",
+  "charge-timetocomplete",
+  "charge-chargetimers",
+] as const;
+
+/**
  * Groupe → métrique. ⚠️ SERT UNIQUEMENT À L'AFFICHAGE d'un code inconnu, JAMAIS au
  * classement en base — voir l'avertissement de `CORRESPONDANCE_EXACTE` et
  * `metriquePourSignal`. Deux signaux d'un même groupe se ranger sous la même métrique
@@ -338,22 +368,42 @@ export function signalVersSnapshot(
   return base;
 }
 
+/**
+ * Codes des signaux d'une charge utile, triés. Alimente le journal de livraison : sans les
+ * NOMS, « 11 reçus » ne dit pas si les quatre absents sont ceux qu'on attendait — c'est
+ * précisément la question « est-ce qu'on reçoit bien toutes les données ? ».
+ */
+export function codesDesSignaux(signaux: unknown): string[] {
+  return listeDeSignaux(signaux)
+    .map((brut) => normaliserSignal(brut)?.code)
+    .filter((code): code is string => Boolean(code))
+    .sort();
+}
+
+/**
+ * Coercition d'une charge utile en liste de signaux bruts — tableau ou objet indexé.
+ * Partagée entre l'ÉCRITURE (`signauxVersSnapshots`) et le JOURNAL (`codesDesSignaux`) :
+ * deux lectures séparées finiraient par diverger, et le journal mentirait sur ce qui
+ * a réellement été écrit.
+ */
+function listeDeSignaux(signaux: unknown): SignalBrut[] {
+  if (Array.isArray(signaux)) return signaux as SignalBrut[];
+  if (signaux && typeof signaux === "object") {
+    return Object.entries(signaux as Record<string, unknown>).map(([code, valeur]) => {
+      const o = objet(valeur);
+      return o ? ({ code, ...o } as SignalBrut) : ({ code, value: valeur } as SignalBrut);
+    });
+  }
+  return [];
+}
+
 /** Traduit une charge utile de signaux en lignes prêtes à insérer. Tolère un tableau ou un objet indexé. */
 export function signauxVersSnapshots(
   signaux: unknown,
   options: OptionsConversion,
 ): NouveauSnapshot[] {
-  const liste: SignalBrut[] = Array.isArray(signaux)
-    ? (signaux as SignalBrut[])
-    : signaux && typeof signaux === "object"
-      ? Object.entries(signaux as Record<string, unknown>).map(([code, valeur]) => {
-          const o = objet(valeur);
-          return o ? ({ code, ...o } as SignalBrut) : ({ code, value: valeur } as SignalBrut);
-        })
-      : [];
-
   const sorties: NouveauSnapshot[] = [];
-  for (const brut of liste) {
+  for (const brut of listeDeSignaux(signaux)) {
     const normalise = normaliserSignal(brut);
     if (!normalise) continue;
     sorties.push(signalVersSnapshot(normalise, options));

@@ -17,23 +17,16 @@
 // elle vient d'une source non officielle, et confondre les deux serait leur prêter la même
 // fiabilité.
 
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { collecter } from "@/lib/vehicle/instantane";
-import { formaterValeur, libelle, nomSource } from "@/lib/vehicle/state";
+import { formaterAge, formaterValeur, libelle, nomSource } from "@/lib/vehicle/state";
 import { resumerBail } from "@/lib/vehicle/lease";
 import { messagePanne } from "@/lib/panne";
 import { NonAutorise, requireSession } from "@/lib/session";
 import { SEUIL_SILENCE_HEURES } from "@/lib/hubSummary";
 
 export const dynamic = "force-dynamic";
-
-function age(minutes: number): string {
-  if (minutes < 1) return "à l'instant";
-  if (minutes < 60) return `il y a ${Math.round(minutes)} min`;
-  const heures = minutes / 60;
-  if (heures < 24) return `il y a ${Math.round(heures)} h`;
-  return `il y a ${Math.round(heures / 24)} j`;
-}
 
 function Coquille({ titre, children }: { titre: string; children: React.ReactNode }) {
   return (
@@ -103,7 +96,7 @@ export default async function Home() {
                 <span className="libelle">{libelle(m.metricType)}</span>
                 <span className="valeur">{formaterValeur(m)}</span>
                 <span className="meta">
-                  {nomSource(m.source)} · {age(m.ageMinutes)}
+                  {nomSource(m.source)} · {formaterAge(m.ageMinutes)}
                   {m.locationType === "real_time" ? " · temps réel" : ""}
                   {m.locationType === "last_parked" ? " · dernier stationnement" : ""}
                 </span>
@@ -131,6 +124,11 @@ export default async function Home() {
           fonctionner sur Smartcar seul.
         </p>
       )}
+
+      <p className="hint">
+        <Link href="/donnees">Inventaire des données</Link> — couverture des signaux,
+        historique des livraisons, volume conservé.
+      </p>
     </Coquille>
   );
 }

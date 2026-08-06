@@ -134,11 +134,89 @@ export async function ingererLivraison(params: {
     })
     .onConflictDoNothing();
 
+  // Purge OPPORTUNISTE du raw hors fenêtre : une requête bornée par index, au rythme des
+  // livraisons (quelques-unes par heure). Jamais bloquante — les données de CETTE livraison
+  // sont déjà écrites, un échec de ménage ne doit pas les faire rejouer par un 500.
+  try {
+    const purgees = await purgerRawWebhooks({ maintenant: recuLe });
+    if (purgees > 0) {
+      console.log(
+        `[smartcar] ménage : payload brut vidé sur ${purgees} livraison(s) hors fenêtre de rétention (lignes conservées).`,
+      );
+    }
+  } catch (err) {
+    console.error("[smartcar] purge du raw impossible — réessaiera à la prochaine livraison", err);
+  }
+
   return { ecrits, dejaTraite: false, ignoree: false };
 }
 
 function empreinte(texte: string): string {
   return createHash("sha256").update(texte).digest("hex").slice(0, 40);
+}
+
+/** Rétention par défaut du payload BRUT des livraisons, en jours. Voir `purgerRawWebhooks`. */
+export const RETENTION_RAW_JOURS_DEFAUT = 90;
+
+/**
+ * Fenêtre de rétention du `raw` des livraisons, lue de `WEBHOOK_RAW_RETENTION_JOURS`.
+ * `0` = conserver pour toujours. Valeur absente, non numérique ou négative → défaut :
+ * une variable mal tapée ne doit pas déclencher une purge inattendue ni l'annuler en silence.
+ */
+export function retentionRawJours(
+  env: Record<string, string | undefined> = process.env,
+): number {
+  const brut = env.WEBHOOK_RAW_RETENTION_JOURS?.trim();
+  if (!brut) return RETENTION_RAW_JOURS_DEFAUT;
+  const n = Number(brut);
+  if (!Number.isFinite(n) || n < 0) return RETENTION_RAW_JOURS_DEFAUT;
+  return Math.floor(n);
+}
+
+/**
+ * Vide le payload BRUT (`raw`) des livraisons plus vieilles que la fenêtre de rétention.
+ *
+ * ══ CE QUE ÇA SUPPRIME, ET CE QUE ÇA NE SUPPRIME JAMAIS ══════════════════════════════
+ * Le `raw` est un artefact de DIAGNOSTIC, redondant par construction : depuis le correctif
+ * de collision (#10), CHAQUE signal d'une livraison — connu ou inconnu — devient son propre
+ * snapshot dans `vehicle_snapshots`, où il est conservé À VIE. Les MESURES ne sont donc
+ * jamais touchées ici ; seule la copie brute du JSON de transport disparaît, et la LIGNE de
+ * livraison reste (idempotence + surveillance du silence intactes).
+ *
+ * Pourquoi purger : à ~5 Ko par livraison et une livraison par heure ou plus, le `raw`
+ * accumule des dizaines de Mo PAR AN de JSON répété — sur le demi-Go du plan Neon gratuit,
+ * c'est LUI qui menace l'objectif « stocker plusieurs années », pas les mesures. Et il
+ * contient la position GPS en double : en garder moins est aussi une décision de vie privée.
+ *
+ * `WEBHOOK_RAW_RETENTION_JOURS=0` désactive la purge (tout garder).
+ */
+export async function purgerRawWebhooks(
+  options: {
+    maintenant?: Date;
+    retentionJours?: number;
+    dbx?: Pick<typeof db, "execute">;
+  } = {},
+): Promise<number> {
+  const {
+    maintenant = new Date(),
+    retentionJours = retentionRawJours(),
+    dbx = db,
+  } = options;
+  if (retentionJours <= 0) return 0;
+
+  const limite = new Date(maintenant.getTime() - retentionJours * 86_400_000);
+  // `RETURNING` pour compter les lignes touchées : la forme du résultat d'un UPDATE nu
+  // diffère entre pilotes (neon-http vs PGlite des tests), celle des lignes non.
+  const resultat = await dbx.execute(sql`
+    UPDATE webhook_deliveries
+    SET raw = NULL
+    WHERE received_at < ${limite.toISOString()} AND raw IS NOT NULL
+    RETURNING event_id
+  `);
+  const lignes =
+    (resultat as { rows?: unknown[] }).rows ??
+    (Array.isArray(resultat) ? (resultat as unknown[]) : []);
+  return lignes.length;
 }
 
 /**

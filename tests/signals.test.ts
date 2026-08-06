@@ -7,6 +7,9 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  CORRESPONDANCE_EXACTE,
+  SIGNAUX_CONFIRMES_BZ,
+  codesDesSignaux,
   interpreterPourcentage,
   metriquePourSignal,
   normaliserSignal,
@@ -222,5 +225,61 @@ describe("interpreterPourcentage — l'unité décide, jamais la valeur", () => 
   it("rend null sur une valeur absente ou non finie", () => {
     expect(interpreterPourcentage(null, "percent").pourcent).toBeNull();
     expect(interpreterPourcentage(Number.POSITIVE_INFINITY, "percent").fiable).toBe(false);
+  });
+});
+
+describe("SIGNAUX_CONFIRMES_BZ — la liste de référence de la couverture", () => {
+  it("compte 15 signaux, tous uniques", () => {
+    // 15 = le rapport Smartcar du 06/08/2026 (statuts SUCCESS sur la bZ). Si un signal
+    // passe SUCCESS plus tard (ex. motion-currentspeed après un Connect élargi), ce test
+    // se met à jour DANS LE MÊME COMMIT que la liste.
+    expect(SIGNAUX_CONFIRMES_BZ).toHaveLength(15);
+    expect(new Set(SIGNAUX_CONFIRMES_BZ).size).toBe(15);
+  });
+
+  it("chaque code confirmé a une correspondance EXACTE (jamais le repli code brut)", () => {
+    // Un code confirmé absent de la table serait stocké sous son code brut : rien ne
+    // serait perdu, mais l'inventaire afficherait un libellé cryptique pour une donnée
+    // qu'on connaît parfaitement.
+    for (const code of SIGNAUX_CONFIRMES_BZ) {
+      expect(CORRESPONDANCE_EXACTE[code], `${code} devrait être mappé`).toBeDefined();
+    }
+  });
+});
+
+describe("codesDesSignaux — le journal dit LESQUELS, pas seulement combien", () => {
+  it("liste les codes triés d'une charge réelle", () => {
+    const codes = codesDesSignaux([
+      { code: "odometer-traveleddistance", body: { value: 1200 } },
+      { code: "closure-islocked", body: { value: true } },
+      { code: "charge-ischarging", body: { value: false } },
+    ]);
+    expect(codes).toEqual([
+      "charge-ischarging",
+      "closure-islocked",
+      "odometer-traveleddistance",
+    ]);
+  });
+
+  it("écarte un signal sans code lisible au lieu d'inventer une entrée", () => {
+    const codes = codesDesSignaux([
+      { code: "closure-islocked", body: { value: true } },
+      { body: { value: 42 } },
+      { code: "   " },
+    ]);
+    expect(codes).toEqual(["closure-islocked"]);
+  });
+
+  it("tolère l'objet indexé, comme le chemin d'écriture", () => {
+    // Même coercition que signauxVersSnapshots : si les deux lectures divergeaient, le
+    // journal mentirait sur ce qui a réellement été écrit.
+    const charge = { "odometer-traveleddistance": { body: { value: 5 } } };
+    expect(codesDesSignaux(charge)).toEqual(["odometer-traveleddistance"]);
+    expect(signauxVersSnapshots(charge, { source: "smartcar", recuLe: RECU_LE })).toHaveLength(1);
+  });
+
+  it("rend une liste vide sur une charge absente", () => {
+    expect(codesDesSignaux(null)).toEqual([]);
+    expect(codesDesSignaux(undefined)).toEqual([]);
   });
 });

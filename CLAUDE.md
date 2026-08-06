@@ -73,16 +73,28 @@ identifiant d'événement. Corollaire assumé : quand une source ne date pas ses
 `recorded_at` retombe sur la réception et la dédup ne joue plus — mieux vaut des doublons
 visibles qu'une fraîcheur inventée.
 
-## Ce qui n'a pas pu être vérifié (à faire quand le réseau le permet)
+⚠️ Corollaire vécu (06/08, 7 mesures sur 15 perdues) : **deux signaux ne doivent JAMAIS
+partager un `metric_type`** — même horodatage ⇒ collision avec l'index unique ⇒ le second
+écarté comme un doublon, sans erreur. C'est pour ça que `metriquePourSignal` n'a plus de
+repli par groupe : un code inconnu devient sa propre métrique.
 
-Deux blocages de la session de création, tous deux **documentés dans le code concerné** :
+## Rétention : mesures à vie, transport 90 jours
 
-1. **`smartcar.com` est filtré par la politique d'egress** → les noms exacts des signaux V3
-   n'ont pas pu être confirmés (seuls `tractionbattery-stateofcharge` et
-   `odometer-traveleddistance` le sont). D'où le mapping à trois niveaux de
-   `lib/smartcar/signals.ts` — code exact, puis groupe, puis code brut — qui ne jette
-   **aucune** donnée même quand un nom est mal deviné. Corriger la table quand la doc est
-   lisible ne fait perdre aucun historique (`signal_code` garde toujours le code d'origine).
+Décision du 06/08 (« BD de qualité pour plusieurs années ») : les **mesures**
+(`vehicle_snapshots`) sont conservées **pour toujours** — ~20-60 Mo/an, tenable des années
+sur le demi-Go Neon gratuit. Le **JSON brut** des livraisons (`webhook_deliveries.raw`),
+redondant par construction, est vidé après `WEBHOOK_RAW_RETENTION_JOURS` (90 par défaut,
+`0` = tout garder) ; les lignes de livraison restent. La page privée `/donnees` compare la
+base aux 15 signaux confirmés (`SIGNAUX_CONFIRMES_BZ`) et nomme les manquants.
+
+## Ce qui n'a pas pu être vérifié (et où ça en est)
+
+1. **`smartcar.com` est filtré par la politique d'egress** → le mapping avait été bâti sur
+   hypothèses. Depuis le 06/08, **les livraisons réelles font foi** : 15 codes confirmés
+   `SUCCESS` mappés un à un (`SIGNAUX_CONFIRMES_BZ`), structure d'enveloppe verrouillée par
+   `tests/livraisonReelle.test.ts`. Un code encore inconnu est stocké sous son code brut —
+   rien n'est jeté, `signal_code` garde toujours l'origine. Ce qui reste non vérifiable
+   sans la doc : le nom des **scopes** du Connect (d'où `SMARTCAR_SCOPES_EXTRA`).
 2. **`toyota-na` est une bibliothèque Python inaccessible** → l'adaptateur réseau Toyota
    (`lib/toyota/client.ts`) est **déclaré, pas deviné**. Des URLs plausibles auraient produit
    du code qui compile et échoue au premier appel, en faisant croire à un changement d'API

@@ -35,6 +35,7 @@ import {
   resumerErreursVehicule,
 } from "@/lib/smartcar/webhook";
 import { ingererLivraison } from "@/lib/smartcar/ingest";
+import { codesDesSignaux } from "@/lib/smartcar/signals";
 import { assurerMigrations } from "@/lib/migrations";
 import { baseConfiguree } from "@/lib/db";
 
@@ -161,10 +162,19 @@ export async function POST(request: Request): Promise<Response> {
     // `ecrits: 0` sur `recus: 11` est le cas NORMAL quand rien n'a bougé depuis la
     // livraison précédente — la déduplication fait son travail. C'est `recus: 0` qui
     // serait anormal.
+    // Les CODES, pas seulement le compte : « 11 reçus » ne dit pas si les absents sont
+    // ceux qu'on attendait. Les noms de signaux ne portent aucune VALEUR (pas de GPS, pas
+    // de kilométrage) — ils peuvent vivre dans un journal.
+    //
+    // `recus` reste le compte BRUT : un signal illisible (sans code) doit apparaître comme
+    // un écart entre « reçus » et la liste des codes, pas disparaître du compte.
     const recus = Array.isArray(evenement.signaux) ? evenement.signaux.length : 0;
+    const codes = codesDesSignaux(evenement.signaux);
     console.log(
       `[smartcar] livraison ${evenement.eventId ?? "sans-id"} : ${recus} signal(aux) reçu(s), ` +
-        `${ecrits} enregistré(s)${dejaTraite ? " (déjà traitée)" : ""}${ignoree ? " (simulée, ignorée)" : ""}.`,
+        `${ecrits} enregistré(s)${dejaTraite ? " (déjà traitée)" : ""}${ignoree ? " (simulée, ignorée)" : ""}.` +
+        (codes.length > 0 ? ` Codes : ${codes.join(", ")}` : "") +
+        (recus !== codes.length ? ` (${recus - codes.length} sans code lisible)` : ""),
     );
 
     return Response.json(
