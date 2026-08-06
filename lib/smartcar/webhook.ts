@@ -69,6 +69,8 @@ export interface EvenementWebhook {
   /** Raisons de la livraison. Sert à comprendre POURQUOI, jamais à filtrer QUOI traiter. */
   declencheurs: unknown;
   vehicleId: string | null;
+  /** `TEST` / `LIVE` tel que déclaré par Smartcar (`meta.mode`). */
+  mode: string | null;
   raw: unknown;
 }
 
@@ -123,23 +125,70 @@ export function lireEvenement(charge: unknown): EvenementWebhook {
   else if (nom.includes("VEHICLE_STATE") || nom.includes("STATE")) type = "VEHICLE_STATE";
   else if (nom.includes("ERROR")) type = "VEHICLE_ERROR";
 
+  // Le véhicule vit sous `data.vehicle` — confirmé par une livraison RÉELLE (06/08/2026).
   const vehicule =
-    payload.vehicle && typeof payload.vehicle === "object"
-      ? (payload.vehicle as Record<string, unknown>)
+    donnees.vehicle && typeof donnees.vehicle === "object"
+      ? (donnees.vehicle as Record<string, unknown>)
+      : payload.vehicle && typeof payload.vehicle === "object"
+        ? (payload.vehicle as Record<string, unknown>)
+        : {};
+
+  // `meta` porte l'identité de la livraison ET son MODE (TEST vs LIVE).
+  const meta =
+    racine.meta && typeof racine.meta === "object"
+      ? (racine.meta as Record<string, unknown>)
       : {};
+
+  const mode = texteOuNull(lire(meta, "mode"))?.toUpperCase() ?? null;
 
   return {
     type,
-    eventId: texteOuNull(lire(racine, "eventId", "id", "deliveryId")),
+    // `deliveryId` identifie LA LIVRAISON ; `eventId` identifie l'ÉVÉNEMENT. Pour
+    // l'idempotence, c'est la livraison qui compte : deux retentatives du même événement
+    // portent le même `eventId` et doivent être traitées une seule fois.
+    eventId:
+      texteOuNull(lire(racine, "eventId")) ??
+      texteOuNull(lire(meta, "deliveryId")) ??
+      texteOuNull(lire(racine, "id", "deliveryId")),
     challenge,
-    signaux: lire(payload, "signals", "data") ?? lire(racine, "signals", "data"),
-    declencheurs: lire(payload, "triggers") ?? lire(racine, "triggers"),
+    // ⚠️ `data.signals` — et SURTOUT PAS `data` tout court. La première version retombait
+    // sur l'objet `data` entier (qui contient `user`, `vehicle`, `signals`) : le pipeline
+    // aurait fabriqué trois pseudo-signaux nommés « user », « vehicle » et « signals ».
+    signaux:
+      lire(donnees, "signals") ?? lire(payload, "signals") ?? lire(racine, "signals"),
+    declencheurs:
+      lire(racine, "triggers") ?? lire(donnees, "triggers") ?? lire(payload, "triggers"),
     vehicleId:
       texteOuNull(lire(vehicule, "id", "vehicleId")) ??
       texteOuNull(lire(payload, "vehicleId")) ??
       texteOuNull(lire(racine, "vehicleId")),
+    /**
+     * `TEST` = données SIMULÉES par Smartcar, pas celles du véhicule de Marc.
+     * Voir `estSimulee` — elles ne doivent jamais entrer dans l'historique.
+     */
+    mode,
     raw: charge,
   };
+}
+
+/**
+ * La livraison contient-elle des données SIMULÉES ?
+ *
+ * ══ POURQUOI CE GARDE EXISTE (constat du 06/08/2026) ═════════════════════════════════
+ * La première livraison reçue portait `meta.mode: "TEST"` : une Tesla Model 3 de 2020,
+ * 78 432 km, 65 % de carburant — un véhicule à moteur thermique, alors que CarAI suit un
+ * bZ électrique.
+ *
+ * Enregistrer ça ne serait pas un détail cosmétique. Ces 78 432 km entreraient dans
+ * l'historique d'odomètre, donc dans la régression du bail, et CarAI annoncerait un
+ * dépassement de dizaines de milliers de kilomètres sur une allocation de 112 000 — une
+ * alerte financière fondée sur une voiture qui n'est pas la sienne.
+ *
+ * Les livraisons de test restent TRACÉES (`webhook_deliveries`) : le pipeline se prouve
+ * de bout en bout, sans qu'un seul chiffre inventé n'atteigne les données.
+ */
+export function estSimulee(evenement: { mode: string | null }): boolean {
+  return evenement.mode === "TEST" || evenement.mode === "SIMULATED";
 }
 
 /** Réponse au défi de vérification : le challenge, haché avec le token de management. */

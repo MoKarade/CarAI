@@ -58,9 +58,22 @@ export async function ingererLivraison(params: {
    * plutôt qu'à aller le demander — voir `apprendreVehicleId`.
    */
   vehicleId?: string | null;
+  /**
+   * Livraison de TEST (données simulées par Smartcar). Elle est TRACÉE, mais aucun
+   * snapshot n'est écrit — voir le bloc dédié plus bas.
+   */
+  simulee?: boolean;
   recuLe?: Date;
-}): Promise<{ ecrits: number; dejaTraite: boolean }> {
-  const { eventId, eventType, signaux, raw, vehicleId, recuLe = new Date() } = params;
+}): Promise<{ ecrits: number; dejaTraite: boolean; ignoree: boolean }> {
+  const {
+    eventId,
+    eventType,
+    signaux,
+    raw,
+    vehicleId,
+    simulee = false,
+    recuLe = new Date(),
+  } = params;
 
   if (eventId) {
     const deja = await db
@@ -68,7 +81,36 @@ export async function ingererLivraison(params: {
       .from(webhookDeliveries)
       .where(eq(webhookDeliveries.eventId, eventId))
       .limit(1);
-    if (deja.length > 0) return { ecrits: 0, dejaTraite: true };
+    if (deja.length > 0) return { ecrits: 0, dejaTraite: true, ignoree: false };
+  }
+
+  // ══ LIVRAISON SIMULÉE : ON TRACE, ON N'ENREGISTRE RIEN ═════════════════════════════
+  //
+  // Une livraison de test porte les données d'un véhicule FICTIF — la première reçue
+  // décrivait une Tesla Model 3 de 2020 à 78 432 km, avec 65 % de CARBURANT. Ces
+  // kilomètres entreraient dans l'historique d'odomètre, donc dans la régression du bail,
+  // et CarAI annoncerait un dépassement de dizaines de milliers de kilomètres fondé sur
+  // une voiture qui n'est pas la sienne. C'est de la fausse donnée à conséquence
+  // financière, pas un désagrément d'affichage.
+  //
+  // La TRACE est conservée : elle prouve que le pipeline fonctionne de bout en bout et
+  // alimente la surveillance du silence, sans qu'un seul chiffre inventé n'atteigne les
+  // données. On n'apprend pas non plus l'identifiant d'un véhicule fictif.
+  if (simulee) {
+    console.warn(
+      `[smartcar] livraison de TEST reçue (${eventType}) — tracée, aucun snapshot enregistré.`,
+    );
+    await db
+      .insert(webhookDeliveries)
+      .values({
+        eventId: eventId ?? empreinte(JSON.stringify(raw ?? {})),
+        eventType: `${eventType}_TEST`,
+        receivedAt: recuLe,
+        snapshotsWritten: 0,
+        raw: raw as object,
+      })
+      .onConflictDoNothing();
+    return { ecrits: 0, dejaTraite: false, ignoree: true };
   }
 
   // Avant toute écriture de données : si la livraison nous apprend l'identifiant du
@@ -92,7 +134,7 @@ export async function ingererLivraison(params: {
     })
     .onConflictDoNothing();
 
-  return { ecrits, dejaTraite: false };
+  return { ecrits, dejaTraite: false, ignoree: false };
 }
 
 function empreinte(texte: string): string {

@@ -28,6 +28,7 @@
 import {
   HEADER_SIGNATURE,
   challengeBienForme,
+  estSimulee,
   lireEvenement,
   livraisonAuthentique,
   reponseChallenge,
@@ -133,7 +134,7 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     await assurerMigrations();
-    const { ecrits, dejaTraite } = await ingererLivraison({
+    const { ecrits, dejaTraite, ignoree } = await ingererLivraison({
       eventId: evenement.eventId,
       eventType: evenement.type,
       signaux: evenement.signaux,
@@ -141,11 +142,14 @@ export async function POST(request: Request): Promise<Response> {
       // La livraison nous apprend l'identifiant du véhicule — plus fiable que d'aller le
       // demander à un endpoint (voir `apprendreVehicleId`).
       vehicleId: evenement.vehicleId,
+      // Les données de TEST sont tracées mais jamais enregistrées : un odomètre fictif
+      // fausserait la projection du bail. Voir `ingererLivraison`.
+      simulee: estSimulee(evenement),
     });
 
     // `ecrits: 0` n'est PAS une anomalie : c'est le cas normal quand aucun signal n'a bougé
     // depuis la dernière livraison (la déduplication fait son travail).
-    return Response.json({ ok: true, ecrits, dejaTraite }, { headers: NO_STORE });
+    return Response.json({ ok: true, ecrits, dejaTraite, ignoree }, { headers: NO_STORE });
   } catch (err) {
     console.error("[smartcar] ingestion impossible", err);
     // 500 assumé : Smartcar RETENTERA, et la déduplication rend le rejeu sans risque. C'est
