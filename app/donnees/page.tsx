@@ -35,6 +35,8 @@ import {
   PERIODES,
   depuisPourPeriode,
   listerMesures,
+  pageEffective,
+  periodeValide,
   valeurAffichable,
   type Periode,
 } from "@/lib/vehicle/mesures";
@@ -127,21 +129,30 @@ export default async function Donnees({
   }
 
   // ── Filtres du tableau, lus de l'URL (form GET : lisible, partageable, sans JS) ─────
+  // La période est NORMALISÉE tout de suite : un `?periode=48h` inconnu (signet périmé,
+  // faute de frappe) doit se LIRE « tout l'historique » partout — sélecteur compris —
+  // plutôt qu'afficher « 24h » au-dessus d'une table qui couvre tout (revue du 06/08).
   const params = await searchParams;
   const filtresUrl = {
     metrique: texteParam(params, "metrique"),
     source: texteParam(params, "source"),
-    periode: (texteParam(params, "periode") ?? "tout") as string,
+    periode: periodeValide(texteParam(params, "periode")) as string,
   };
   const pageBrute = Number(texteParam(params, "page") ?? "1");
-  const page = Number.isInteger(pageBrute) && pageBrute >= 1 ? pageBrute : 1;
+  const pageDemandee = Number.isInteger(pageBrute) && pageBrute >= 1 ? pageBrute : 1;
   const instantRequete = new Date();
+  const filtresRequete = {
+    metricType: filtresUrl.metrique,
+    source: filtresUrl.source,
+    depuis: depuisPourPeriode(filtresUrl.periode, instantRequete),
+  };
 
   let inventaire: LigneInventaire[];
   let livraisons: LigneLivraison[];
   let derniereEcriture: Date | null;
   let mesures: VehicleSnapshot[];
   let totalSelection: number;
+  let page = pageDemandee;
   try {
     await assurerMigrations();
     let selection: Awaited<ReturnType<typeof listerMesures>>;
@@ -150,17 +161,25 @@ export default async function Donnees({
       journalLivraisons(30),
       derniereEcritureReussie(),
       listerMesures({
-        filtres: {
-          metricType: filtresUrl.metrique,
-          source: filtresUrl.source,
-          depuis: depuisPourPeriode(filtresUrl.periode, instantRequete),
-        },
+        filtres: filtresRequete,
         limite: TAILLE_PAGE,
-        offset: (page - 1) * TAILLE_PAGE,
+        offset: (pageDemandee - 1) * TAILLE_PAGE,
       }),
     ]);
+    totalSelection = selection.total ?? 0;
+
+    // Page au-delà de la fin (vieux lien, sélection rétrécie sous le rafraîchissement
+    // auto) : on sert la DERNIÈRE page réelle plutôt qu'un faux « aucune mesure » sans
+    // lien de retour (revue du 06/08).
+    page = pageEffective(pageDemandee, totalSelection, TAILLE_PAGE);
+    if (page !== pageDemandee) {
+      selection = await listerMesures({
+        filtres: filtresRequete,
+        limite: TAILLE_PAGE,
+        offset: (page - 1) * TAILLE_PAGE,
+      });
+    }
     mesures = selection.lignes;
-    totalSelection = selection.total;
   } catch (err) {
     console.error("[donnees] lecture impossible", err);
     return (
@@ -175,8 +194,17 @@ export default async function Donnees({
   const totalMesures = inventaire.reduce((somme, l) => somme + l.nbMesures, 0);
   const retention = retentionRawJours();
   const pages = Math.max(1, Math.ceil(totalSelection / TAILLE_PAGE));
+  // Les sélecteurs reflètent le filtre RÉELLEMENT appliqué : une valeur d'URL absente des
+  // options connues y est AJOUTÉE — sinon le navigateur retombe sur « Toutes » pendant
+  // que la table, elle, filtre (revue du 06/08).
   const metriquesConnues = [...new Set(inventaire.map((l) => l.metricType))].sort();
+  if (filtresUrl.metrique && !metriquesConnues.includes(filtresUrl.metrique)) {
+    metriquesConnues.push(filtresUrl.metrique);
+  }
   const sourcesConnues = [...new Set(inventaire.map((l) => l.source))].sort();
+  if (filtresUrl.source && !sourcesConnues.includes(filtresUrl.source)) {
+    sourcesConnues.push(filtresUrl.source);
+  }
 
   // « Livraisons récentes mais plus AUCUNE écriture » : la panne muette par excellence.
   // Le bandeau de couverture est cumulatif à vie — un flux qui a cessé d'écrire y reste
@@ -337,7 +365,7 @@ export default async function Donnees({
         <a href="/api/donnees/export">Exporter TOUTE la base en CSV</a>
       </form>
 
-      {mesures.length === 0 ? (
+      {totalSelection === 0 ? (
         <p className="hint">Aucune mesure ne correspond à ces filtres.</p>
       ) : (
         <>

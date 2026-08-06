@@ -10,7 +10,10 @@ import { sql } from "drizzle-orm";
 import { vehicleSnapshots, type VehicleSnapshot } from "@/lib/db/schema";
 import {
   depuisPourPeriode,
+  estPosition,
   listerMesures,
+  pageEffective,
+  periodeValide,
   valeurAffichable,
 } from "@/lib/vehicle/mesures";
 
@@ -71,6 +74,13 @@ describe("listerMesures — filtres, ordre, pagination, total", () => {
     expect(page2.lignes).toHaveLength(2);
     expect(page2.total).toBe(4);
     expect(page2.lignes.map((l) => l.recordedAt.getUTCDate())).toEqual([2, 1]);
+  });
+
+  it("avecTotal: false saute le count — l'export ne recompte pas la table à chaque page", async () => {
+    await semer();
+    const sansTotal = await listerMesures({ limite: 2, avecTotal: false, dbx });
+    expect(sansTotal.lignes).toHaveLength(2);
+    expect(sansTotal.total).toBeNull();
   });
 
   it("pagination par CURSEUR : reprend exactement après la dernière ligne servie", async () => {
@@ -136,6 +146,30 @@ describe("valeurAffichable — l'écran montre tout SAUF les coordonnées", () =
     expect(rendu).not.toContain("46");
   });
 
+  it("la garde est par CONTENU : un code de position INCONNU est masqué aussi", () => {
+    // Finding HIGH de la revue du 06/08 (prouvé par exécution) : le pipeline stocke tout
+    // code inconnu sous sa propre métrique et le repli « corps entier » conserve
+    // {latitude, longitude} quel que soit le code. Une garde par identité exacte laissait
+    // `location-approximatelocation` afficher ses coordonnées en clair. Quatre signaux
+    // indépendants — chacun suffit.
+    const inconnu = {
+      ...base,
+      metricType: "location-approximatelocation",
+      signalCode: "location-approximatelocation",
+      valueJson: { latitude: 46.157352, longitude: -71.88961 },
+    };
+    expect(estPosition(inconnu)).toBe(true);
+    expect(valeurAffichable(inconnu)).toBe("position (voir export CSV)");
+
+    // Par le locationType porté par la ligne, même sous un code absurde.
+    expect(estPosition({ ...base, locationType: "last_parked" })).toBe(true);
+
+    // Par les CLÉS du JSON, même sans code ni métrique reconnaissables.
+    expect(
+      valeurAffichable({ ...base, metricType: "mystere", valueJson: { lat: 1, lng: 2 } }),
+    ).toBe("position (voir export CSV)");
+  });
+
   it("un détail JSON non sensible S'AFFICHE — c'est pour le voir que le tableau existe", () => {
     const rendu = valeurAffichable({
       ...base,
@@ -151,7 +185,7 @@ describe("valeurAffichable — l'écran montre tout SAUF les coordonnées", () =
   });
 });
 
-describe("depuisPourPeriode — la fenêtre du filtre", () => {
+describe("depuisPourPeriode / periodeValide — la fenêtre du filtre", () => {
   const maintenant = new Date("2026-08-06T12:00:00.000Z");
 
   it("24h / 7j / 30j / tout", () => {
@@ -165,5 +199,27 @@ describe("depuisPourPeriode — la fenêtre du filtre", () => {
     // Une période inconnue N'AMPUTE PAS la sélection : tout l'historique.
     expect(depuisPourPeriode("bidon", maintenant)).toBeNull();
     expect(depuisPourPeriode(undefined, maintenant)).toBeNull();
+  });
+
+  it("periodeValide normalise — l'écran affiche la clé RÉELLEMENT appliquée", () => {
+    expect(periodeValide("7j")).toBe("7j");
+    expect(periodeValide("48h")).toBe("tout");
+    expect(periodeValide(null)).toBe("tout");
+    // Un nom de la chaîne de prototypes passait `in` et produisait une date invalide
+    // (revue du 06/08) : `Object.hasOwn` ferme le cas.
+    expect(periodeValide("constructor")).toBe("tout");
+    expect(depuisPourPeriode("constructor", maintenant)).toBeNull();
+  });
+});
+
+describe("pageEffective — jamais de page fantôme", () => {
+  it("borne à la dernière page réelle, plancher 1", () => {
+    // Sélection rétrécie sous le rafraîchissement auto : page 5 de 380 lignes → page 4.
+    expect(pageEffective(5, 380, 100)).toBe(4);
+    // Vieux lien ?page=3 sur 4 mesures → page 1, pas « aucune mesure ».
+    expect(pageEffective(3, 4, 100)).toBe(1);
+    expect(pageEffective(1, 0, 100)).toBe(1);
+    expect(pageEffective(0, 50, 100)).toBe(1);
+    expect(pageEffective(2, 250, 100)).toBe(2);
   });
 });

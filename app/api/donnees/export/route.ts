@@ -19,6 +19,7 @@ import { baseConfiguree } from "@/lib/db";
 import {
   depuisPourPeriode,
   listerMesures,
+  periodeValide,
   type FiltresMesures,
 } from "@/lib/vehicle/mesures";
 import { NonAutorise, requireSession } from "@/lib/session";
@@ -84,44 +85,57 @@ export async function GET(request: Request): Promise<Response> {
   const filtres: FiltresMesures = {
     metricType: params.get("metrique") || null,
     source: params.get("source") || null,
-    depuis: depuisPourPeriode(params.get("periode") ?? "tout", maintenant),
+    depuis: depuisPourPeriode(periodeValide(params.get("periode")), maintenant),
   };
 
   await assurerMigrations();
 
+  // ══ CONTRE-PRESSION : la boucle vit dans `pull`, jamais dans `start` ═══════════════
+  // `enqueue` ne bloque pas : une boucle complète dans `start` lirait la table ENTIÈRE au
+  // rythme de la base pendant qu'un client lent draine — le CSV complet s'accumulerait en
+  // mémoire et tuerait la fonction précisément le jour où l'export a le plus de valeur
+  // (revue du 06/08/2026, prouvé par sonde : 1 Go retenu dans la file interne). Avec
+  // `pull`, le runtime ne redemande une page que quand le client a fait de la place.
+  //
+  // Pagination par CURSEUR, jamais par offset : la table reçoit des lignes en continu, et
+  // un offset qui se décale entre deux pages DUPLIQUE des lignes en silence (leçon DriveAI
+  // sur les files mouvantes). Et pas de `count(*)` ici : l'export n'affiche pas de total,
+  // le recompter à chaque page balaierait toute la sélection pour rien.
   const encodeur = new TextEncoder();
+  let curseur: { recordedAt: Date; id: number } | null = null;
+  let premierePage = true;
+  let fini = false;
+
   const flux = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      try {
-        // Pagination par CURSEUR, jamais par offset : la table reçoit des lignes en
-        // continu, et un offset qui se décale entre deux pages DUPLIQUE des lignes en
-        // silence (leçon DriveAI sur les files mouvantes). Le curseur fige la position.
-        let curseur: { recordedAt: Date; id: number } | null = null;
-        let premierePage = true;
-
-        for (;;) {
-          const { lignes } = await listerMesures({
-            filtres,
-            limite: TAILLE_PAGE_EXPORT,
-            curseur,
-          });
-
-          if (premierePage) {
-            // Première page AVEC l'en-tête (et le BOM qu'il transporte).
-            controller.enqueue(
-              encodeur.encode(documentCsv(ENTETES, lignes.map(versLigne))),
-            );
-            premierePage = false;
-          } else if (lignes.length > 0) {
-            const bloc = lignes.map((l) => ligneCsv(versLigne(l))).join("\r\n");
-            controller.enqueue(encodeur.encode(`${bloc}\r\n`));
-          }
-
-          if (lignes.length < TAILLE_PAGE_EXPORT) break;
-          const derniere = lignes[lignes.length - 1]!;
-          curseur = { recordedAt: derniere.recordedAt, id: derniere.id };
-        }
+    async pull(controller) {
+      if (fini) {
         controller.close();
+        return;
+      }
+      try {
+        const { lignes } = await listerMesures({
+          filtres,
+          limite: TAILLE_PAGE_EXPORT,
+          curseur,
+          avecTotal: false,
+        });
+
+        if (premierePage) {
+          // Première page AVEC l'en-tête (et le BOM qu'il transporte).
+          controller.enqueue(encodeur.encode(documentCsv(ENTETES, lignes.map(versLigne))));
+          premierePage = false;
+        } else if (lignes.length > 0) {
+          const bloc = lignes.map((l) => ligneCsv(versLigne(l))).join("\r\n");
+          controller.enqueue(encodeur.encode(`${bloc}\r\n`));
+        }
+
+        if (lignes.length < TAILLE_PAGE_EXPORT) {
+          fini = true;
+          controller.close();
+          return;
+        }
+        const derniere = lignes[lignes.length - 1]!;
+        curseur = { recordedAt: derniere.recordedAt, id: derniere.id };
       } catch (err) {
         // Un flux coupé se VOIT (téléchargement en erreur) — c'est le comportement
         // honnête. L'avaler produirait un CSV tronqué que rien ne distingue d'un complet.

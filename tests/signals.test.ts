@@ -324,16 +324,65 @@ describe("formes RÉELLES du catalogue de signaux (06/08/2026, bZ live)", () => 
       signalVersSnapshot(tempsReel!, { source: "smartcar", recuLe: RECU_LE }).locationType,
     ).toBe("real_time");
 
-    // Non-régression : `body: { value, unit }` ne doit PAS tomber dans le repli corps
-    // entier — l'autonomie réelle porte aussi type/additionalValues à côté de value.
+    // `body: { value, unit, … }` garde le chemin nominal ET conserve les champs FRÈRES :
+    // jeter `additionalValues` perdait l'autonomie par mode de conduite que la source
+    // livrait, et la purge du raw effaçait ensuite la seule copie (revue du 06/08).
     const autonomie = normaliserSignal({
       code: "tractionbattery-range",
-      body: { value: 293.8, type: "DEFAULT", additionalValues: [], unit: "km" },
+      body: {
+        value: 293.8,
+        type: "DEFAULT",
+        additionalValues: [{ type: "ESTIMATED", value: 280 }],
+        unit: "km",
+      },
     });
     const ligne = signalVersSnapshot(autonomie!, { source: "smartcar", recuLe: RECU_LE });
     expect(ligne.valueNumeric).toBe(293.8);
     expect(ligne.unit).toBe("km");
+    expect(ligne.valueJson).toEqual({
+      type: "DEFAULT",
+      additionalValues: [{ type: "ESTIMATED", value: 280 }],
+    });
+  });
+
+  it("un statut NON-SUCCESS ne fabrique JAMAIS une valeur depuis des restes structurels", () => {
+    // `UNKNOWN` avec un corps `{ type, additionalValues }` sans `value` : la vérité est
+    // « la source a répondu sans valeur », pas ce squelette (revue du 06/08, par sonde).
+    const refuse = normaliserSignal({
+      code: "tractionbattery-range",
+      body: { type: "DEFAULT", additionalValues: [], unit: "km" },
+      status: { value: "UNKNOWN" },
+    });
+    const ligne = signalVersSnapshot(refuse!, { source: "smartcar", recuLe: RECU_LE });
+    expect(ligne.valueNumeric).toBeNull();
     expect(ligne.valueJson).toBeNull();
+    expect(ligne.signalStatus).toBe("UNKNOWN");
+  });
+
+  it("options.locationType ne s'applique QU'AUX positions, jamais au lot entier", () => {
+    // Un poll Toyota livre odomètre + position dans un même lot : étiqueter l'odomètre
+    // « dernier stationnement » créerait un faux signal de position — et locationType non
+    // nul est un des déclencheurs de la garde d'affichage GPS.
+    const odometre = normaliserSignal({ code: "odometer-traveleddistance", body: { value: 5 } });
+    expect(
+      signalVersSnapshot(odometre!, {
+        source: "toyota_na",
+        recuLe: RECU_LE,
+        locationType: "last_parked",
+      }).locationType,
+    ).toBeNull();
+
+    const position = normaliserSignal({
+      code: "location-preciselocation",
+      body: { latitude: 1, longitude: 2 },
+    });
+    expect(
+      signalVersSnapshot(position!, {
+        source: "toyota_na",
+        recuLe: RECU_LE,
+        locationType: "last_parked",
+      }).locationType,
+    ).toBe("last_parked");
   });
 });
 
