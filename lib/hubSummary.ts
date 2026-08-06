@@ -32,7 +32,23 @@ export const APP: HubSummary["app"] = {
   id: "carai",
   name: "CarAI",
   url: "https://carai.hubperso.com",
-  color: "#2f9e6e",
+  /**
+   * Rose profond — teinte 333°, choisie pour être DISTINGUABLE des quatre autres cartes du
+   * hub, qui s'affichent côte à côte dans la même grille.
+   *
+   * Teintes déjà occupées : BatchChef 17° (orange brûlé), JobAI 38° (ambre), FinanceAI 175°
+   * (sarcelle), DriveAI 217° (bleu clair). Deux zones restaient libres — les verts et les
+   * magentas. Le VERT a été écarté après mesure : le précédent `#2f9e6e` tombait à 21° du
+   * sarcelle de FinanceAI. Or sur une carte du hub la couleur ne se voit quasiment que dans
+   * la barre d'accent de 3 px en haut — deux barres à 21° d'écart s'y confondent, surtout en
+   * thème sombre.
+   *
+   * Ce rose est à 44° de sa plus proche voisine, et son contraste est ÉQUILIBRÉ entre les
+   * deux thèmes : 4,22 sur le fond clair, 4,17 sur le sombre. L'équilibre compte parce que
+   * le hub suit `prefers-color-scheme` et que son thème PAR DÉFAUT est le clair — là où
+   * l'ancien vert ne donnait que 3,09.
+   */
+  color: "#db2777",
 };
 
 export interface InstantaneCarAI {
