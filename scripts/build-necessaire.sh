@@ -52,6 +52,11 @@ if [ -z "$BASE" ]; then
   fi
 fi
 
+# Rend le journal Vercel lisible : sans ça, un build sauté n'affiche que « documentation et
+# tests uniquement » et on ne sait pas QUELLE plage a été comparée (le 19/10, il a fallu la
+# reconstituer à la main pour comprendre pourquoi un Redeploy était annulé).
+echo "comparaison : $(git rev-parse --short "$BASE" 2>/dev/null || echo "$BASE") -> $(git rev-parse --short "$TETE" 2>/dev/null || echo "$TETE")"
+
 FICHIERS=$(git diff --name-only "$BASE" "$TETE") || lancer "diff illisible"
 [ -n "$FICHIERS" ] || lancer "aucun fichier lisible dans le diff"
 
@@ -60,6 +65,15 @@ FICHIERS=$(git diff --name-only "$BASE" "$TETE") || lancer "diff illisible"
 # de ce qui construit est ouverte.
 while IFS= read -r f; do
   case "$f" in
+    # ⚠️ CHANGER UNE VARIABLE D'ENVIRONNEMENT NE CHANGE AUCUN FICHIER : git ne voit rien, et un
+    # « Redeploy » du tableau de bord rejoue le MÊME commit, dont le diff ne contient que des
+    # tests ou de la doc — donc ce script répond « ignorer » et Vercel annule (CANCELED), alors
+    # que le site sert toujours les anciennes valeurs. Vécu le 19/10 : quatre déploiements de
+    # production annulés d'affilée après le changement de `CRON_SECRET`, la route du poll
+    # Smartcar répondait 401 avec le nouveau secret.
+    # Le geste fiable est donc un COMMIT qui touche ce fichier (la liste des exemptions est
+    # fermée : il construit) ; voir `docs/claude/06-bis-quota-deploiement.md`.
+    vercel-rebuild.txt) lancer "reconstruction demandée (vercel-rebuild.txt)" ;;
     *.md) ;;
     docs/*) ;;
     # `test/` ET `tests/` : le parc écrit les deux (DriveAI au singulier, Hubperso et JobAI

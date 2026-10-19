@@ -1281,6 +1281,7 @@ le même écran vide**, et qu'aucune ne se déduit — chacune a son test.
 
 **Le test de chacune, pour la prochaine fois :**
 - *build sauté* → rejouer `scripts/build-necessaire.sh <base> <tête>` sur les vrais commits ;
+  (variable d'environnement changée puis « Redeploy » annulé : voir `docs/claude/06-bis-quota-deploiement.md`, il faut un commit sur `vercel-rebuild.txt`) ;
 - *quota du compte* → regarder si un AUTRE projet du compte a déployé dans la même fenêtre ;
 - *intégration Git* → ce qui reste quand les deux premiers sont écartés.
 
