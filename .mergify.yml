@@ -1,0 +1,71 @@
+# Fusion automatique (Mergify, plan gratuit) — 15/10/2026.
+# Une PR prête (pas brouillon, sans l'étiquette « hold ») entre dans la file,
+# est remise à jour sur la tête de main, retestée par le robot du PC, puis fusionnée en squash.
+# Chemins protégés (.github/, hooks, qualite/, vercel.json, drizzle/, .env, extras du dépôt) : fusionnés aussi,
+# SI le contrôle « Garde-fou » est vert (oui écrit de Marc, 15/10/2026). Rouge = la PR attend et une issue
+# `qui:marc` s'ouvre. Règles et tests : MoKarade/.github, scripts/garde-fou.mjs. Ce fichier ne se modifie pas seul.
+# Une PR à la fois : pas de regroupement. Étiquette « hold » sur une PR = elle ne fusionne pas.
+queue_rules:
+  - name: default
+    merge_method: squash
+    batch_size: 1
+    queue_conditions:
+      - base = main
+      - -draft
+      - label != hold
+      - label != do-not-merge
+      # Chemins protégés : fusionnés si le contrôle « Garde-fou » est vert (oui écrit de Marc, 15/10/2026). Il est vert
+      # d'office hors chemins protégés. Exception Dependabot conservée (oui de Marc, MoKarade/.github#26) : montée
+      # mineure ou corrective des actions, rien hors de .github/, aucun commit d'un autre auteur. Les majeures :
+      # elles passent par le garde-fou comme tout le reste.
+      - or:
+          - 'check-success = Garde-fou'
+          - and:
+              - 'author = dependabot[bot]'
+              - 'head ~= ^dependabot/github_actions/'
+              - '-files ~= ^(?!\.github/)'
+              - 'dependabot-update-type ~= ^version-update:semver-(minor|patch)$'
+              - '-dependabot-update-type = version-update:semver-major'
+              - '-commits[*].author ~= ^(?!(dependabot\[bot\]|mergify\[bot\])$)'
+      - check-success = Gate (typecheck · lint · tests · build)
+      - check-success = Qualité (lint · couverture · code mort · architecture)
+      - check-success = Sécurité (secrets · analyse statique)
+    merge_conditions:
+      - label != hold
+      - label != do-not-merge
+      # Chemins protégés : fusionnés si le contrôle « Garde-fou » est vert (oui écrit de Marc, 15/10/2026). Il est vert
+      # d'office hors chemins protégés. Exception Dependabot conservée (oui de Marc, MoKarade/.github#26) : montée
+      # mineure ou corrective des actions, rien hors de .github/, aucun commit d'un autre auteur. Les majeures :
+      # elles passent par le garde-fou comme tout le reste.
+      - or:
+          - 'check-success = Garde-fou'
+          - and:
+              - 'author = dependabot[bot]'
+              - 'head ~= ^dependabot/github_actions/'
+              - '-files ~= ^(?!\.github/)'
+              - 'dependabot-update-type ~= ^version-update:semver-(minor|patch)$'
+              - '-dependabot-update-type = version-update:semver-major'
+              - '-commits[*].author ~= ^(?!(dependabot\[bot\]|mergify\[bot\])$)'
+      - check-success = Gate (typecheck · lint · tests · build)
+      - check-success = Qualité (lint · couverture · code mort · architecture)
+      - check-success = Sécurité (secrets · analyse statique)
+
+merge_protections_settings:
+  auto_merge_conditions:
+    - base = main
+    - -draft
+    - label != hold
+    - label != do-not-merge
+    # Chemins protégés : fusionnés si le contrôle « Garde-fou » est vert (oui écrit de Marc, 15/10/2026). Il est vert
+    # d'office hors chemins protégés. Exception Dependabot conservée (oui de Marc, MoKarade/.github#26) : montée
+    # mineure ou corrective des actions, rien hors de .github/, aucun commit d'un autre auteur. Les majeures :
+    # elles passent par le garde-fou comme tout le reste.
+    - or:
+        - 'check-success = Garde-fou'
+        - and:
+            - 'author = dependabot[bot]'
+            - 'head ~= ^dependabot/github_actions/'
+            - '-files ~= ^(?!\.github/)'
+            - 'dependabot-update-type ~= ^version-update:semver-(minor|patch)$'
+            - '-dependabot-update-type = version-update:semver-major'
+            - '-commits[*].author ~= ^(?!(dependabot\[bot\]|mergify\[bot\])$)'

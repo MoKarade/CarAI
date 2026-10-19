@@ -1,0 +1,4373 @@
+/* ══ SYSTÈME DE DESIGN — refonte du 13/08/2026 ════════════════════════════════════════
+   Marc : « on dirait un logiciel de gestion tellement c'est moche et plat ».
+
+   Le diagnostic était juste, et « plat » en était la cause exacte : tout l'écran était au
+   même niveau — même fond, même bordure, même poids de texte, du titre au pied de page.
+   Rien ne disait quoi regarder en premier. Trois leviers, dans cet ordre d'importance :
+
+   1. HIÉRARCHIE. Une échelle typographique large (un chiffre de tableau de bord fait trois
+      fois la taille de sa légende) et des surfaces à plusieurs profondeurs.
+   2. COULEUR QUI SIGNIFIE. L'accent ne décore pas : il marque ce qui est vivant. Les états
+      (ok / attention / danger) gardent leurs teintes propres, jamais l'accent.
+   3. RESPIRATION. Les espacements viennent d'une échelle, pas de valeurs au jugé.
+
+   ⚠️ SOMBRE ASSUMÉ depuis le 17/08/2026 — décision EXPLICITE de Marc (refonte
+   « style constructeur ») : l'app est toujours sombre, de jour comme de nuit. Ça remplace,
+   pour CarAI seulement, la règle par défaut « suivre le réglage du système » du CLAUDE.md
+   global — c'est le cas prévu par la règle elle-même (« sauf si Marc demande »).
+   L'ancien thème clair est SUPPRIMÉ, pas caché : un thème qu'on ne voit jamais dérive en
+   silence, et on croirait couvert ce qui ne l'est plus.
+
+   ⚠️ DEUX POINTS DE RUPTURE, ET SEULEMENT DEUX (18/09/2026, refonte demandée par Marc :
+   « full retravailler l'interface sur PC et téléphone »).
+
+       max-width: 700px   → le TÉLÉPHONE, et son complément min-width: 700px
+       min-width: 900px   → le GRAND ÉCRAN
+
+   Il y en avait SIX, mesurés : 34rem, 40rem, 46rem, 52rem, 700px, 900px — quatre en `rem`
+   et deux en `px`, soit 544 / 640 / 700 / 736 / 832 / 900. C'est exactement là que
+   l'incohérence entre le PC et le téléphone se fabrique : une carte bascule en colonne à
+   832 px, la grille du héros attend 900 px, et personne ne peut deviner ce que fait
+   l'écran entre les deux.
+
+   Ce que le ménage a trouvé, et qui ne se voyait pas : QUATRE de ces six blocs étaient
+   MORTS — `.trajets` (deux blocs, à 34rem et 40rem, dont le premier était de toute façon
+   intégralement écrasé par le second), `.panneau-vehicule` et `.heros` ne sont plus posés
+   par aucun JSX. Un seul bloc vivant a changé de seuil : `.panneau-etat` / `.panneau-cote`,
+   de 46rem (736 px) à 700 px.
+
+   ⚠️ La règle est tenue par `tests/pointsDeRupture.test.ts`, pas par cette phrase. Un
+   commentaire qui réclame de la vigilance est l'aveu qu'il manque une garde. */
+
+:root {
+  color-scheme: dark;
+
+  /* ══ LE SOCLE COMMUN (CarAI#217, 16/10/2026) ═══════════════════════════════════════
+     Mêmes NOMS de jetons que app-template, BatchChef et JobAI, en HEXADÉCIMAL : c'est ce
+     qui les rend mesurables par tests/theme.test.ts. Les VALEURS restent celles de CarAI :
+     elles viennent des oklch d'avant, relues dans Chromium : mêmes teintes, à 1/255 près.
+     Seul écart visible, et voulu : plus de `@supports` généré par la minification, qui
+     redéclarait `background` et défaisait `fixed` et `background-clip: text` (CarAI#217). Sombre seul (décision de Marc, 17/08/2026) : aucune variante claire.
+
+     Les couples fond/texte de la sémantique (`--succes-fond` …) sont les teintes d'état à
+     10 % posées sur `--surface` : opaques, donc mesurables. Les règles de la feuille qui
+     veulent une teinte translucide (bordure, voile) la tirent du jeton vif par
+     `color-mix(…)`, jamais d'une valeur écrite en dur. */
+
+  /* Fonds : trois profondeurs, plus le voile des surfaces posées dessus. */
+  --fond: #060911;
+  --fond-2: #0b0f18;
+  --surface: #10151f;
+  --surface-douce: #171d28;
+  --voile: #a5aec20f;
+
+  --texte: #eceef4;
+  --texte-doux: #a3a8b1;
+  /* Titres de section, légendes : 4,99:1 sur `--surface`, 4,61:1 sur `--surface-douce` (CarAI#284,
+     avant : 4,25 et 3,93). Reste nettement sous `--texte-doux` pour garder la hiérarchie. */
+  --texte-faible: #808690;
+  --bordure: #242934;
+  --bordure-nette: #363d4b;
+  /* Contour de champ, de case et de bouton secondaire : ≥ 3:1 (WCAG 1.4.11). */
+  --bordure-champ: #6f7b8e;
+
+  /* L'accent et son dégradé — l'électrique assumé, pas l'indigo d'un thème par défaut. */
+  --accent: #569dff;
+  --accent-fonce: #3d84ea;
+  --sur-accent: #090d16;
+  --accent-clair: #00d5ef;
+  --accent-voile: #569dff24;
+  --degrade: linear-gradient(135deg, var(--accent), var(--accent-clair));
+
+  /* Le repère : surtitre, navigation active, catégorie — jamais un état. Chez CarAI c'est
+     l'accent lui-même (le socle donne l'orange à son propre repère). */
+  --repere: #569dff;
+  --repere-doux: #0f1f37;
+
+  /* Les états. Ils ne se mélangent JAMAIS avec l'accent : une couleur qui veut dire deux
+     choses ne veut plus rien dire. Le jeton `-texte` est la teinte vive : texte, point,
+     contour ou remplissage selon la règle. */
+  --succes-fond: #172729;
+  --succes-texte: #52cd86;
+  --alerte-fond: #272422;
+  --alerte-texte: #f5ae39;
+  --erreur-fond: #281e27;
+  --erreur-texte: #fd736d;
+  --inconnu: #636975;
+
+  /* Teintes d'état à d'autres clartés : une par emploi, nommée par ce qu'elle porte. */
+  --succes-clair: #59d38c;
+  --succes-pale: #77e5a2;
+  --succes-profond: #006c2c;
+  --succes-turquoise: #00a089;
+  --alerte-bordure: #d48e00;
+  --alerte-pale: #ffc55c;
+  --alerte-jaune: #eab532;
+  --erreur-bordure: #d33a3c;
+  --erreur-clair: #ff847c;
+  --erreur-vif: #c90019;
+  --erreur-orange: #e9622e;
+  --erreur-rayure: #ec5d4b;
+
+  /* Neutres translucides (on les dose par `color-mix`), noir et blanc des ombres, halo. */
+  --neutre: #7a808d;
+  --neutre-clair: #979fab;
+  --texte-clair: #f3f5f9;
+  --halo: #009be5;
+  --blanc: #ffffff;
+  --noir: #000000;
+
+  /* Fonds de groupe de l'accueil sur téléphone : une marche au-dessus de la carte, teintée
+     par le sujet. */
+  --groupe: #141924;
+  --groupe-voiture: #0c1930;
+  --groupe-alertes: #281400;
+  --groupe-mois: #002011;
+  --groupe-bail: #211900;
+
+  /* Élévation : trois marches. Une ombre unique partout, c'est encore du plat. */
+  --ombre-1: 0 1px 0 color-mix(in srgb, var(--blanc) 4%, transparent) inset, 0 1px 2px color-mix(in srgb, var(--noir) 40%, transparent);
+  --ombre-2: 0 1px 0 color-mix(in srgb, var(--blanc) 5%, transparent) inset, 0 8px 24px -10px color-mix(in srgb, var(--noir) 60%, transparent);
+  --ombre-3: 0 1px 0 color-mix(in srgb, var(--blanc) 6%, transparent) inset, 0 24px 56px -22px color-mix(in srgb, var(--noir) 75%, transparent);
+
+  /* ══ LA TAILLE DE LA VOITURE, DÉFINIE UNE SEULE FOIS ═══════════════════════════════
+     `.schema-pilote` la porte ; la carte de l'accueil s'y aligne en hauteur (Marc, 21/08 :
+     « carte même hauteur que hauteur voiture »). Écrire 603 px en dur dans la carte aurait
+     marché aujourd'hui et menti au premier ajustement de la voiture — c'est exactement la
+     dérive que ce fichier a déjà payée deux fois.
+
+     ⚠️ La hauteur se DÉRIVE du rapport de l'image (760 × 1685). Elle ne se mesure pas :
+     mesurée, elle se périmerait à la prochaine image. */
+  --voiture-largeur: 17rem;
+  --voiture-hauteur: calc(var(--voiture-largeur) * 1685 / 760);
+  --rayon: 14px;
+  --rayon-l: 20px;
+  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+* {
+  margin: 0;
+}
+
+body {
+  background:
+    /* Deux halos très diffus : ce qui empêche un fond uni de faire « écran de gestion ».
+       Fixés, donc ils ne bougent pas au défilement et ne coûtent rien à repeindre. */
+    radial-gradient(1200px 600px at 12% -8%, var(--accent-voile), transparent 60%),
+    radial-gradient(900px 500px at 92% 4%, color-mix(in srgb, var(--halo) 7%, transparent), transparent 62%),
+    var(--fond);
+  background-attachment: fixed;
+  color: var(--texte);
+  font-family: var(--font);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.shell {
+  min-height: 100dvh;
+  display: grid;
+  place-items: start center;
+  padding: clamp(0.75rem, 2vw, 2rem);
+}
+.carte {
+  max-width: 34rem;
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon-l);
+  padding: clamp(1rem, 0.85rem + 1.5vw, 1.75rem);
+  box-shadow: var(--ombre-2);
+  position: relative;
+  overflow: hidden;
+}
+.carte::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: var(--degrade);
+  opacity: 0.9;
+}
+
+/* ══ TYPOGRAPHIE — l'échelle EST la hiérarchie ═══════════════════════════════════════ */
+/* Le titre de page est SEUL en tête de carte (Marc, 17/08 : « enlève le hubperso.com ·
+   CarAI, juste un beau titre ») — le sur-titre `.eyebrow` a disparu avec sa règle. Ce qui
+   fait « titre » : la taille, et la même barre dégradée que les h2, en soulignement. */
+h1 {
+  font-size: clamp(1.75rem, 1.3rem + 2.2vw, 2.5rem);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+  margin: 0.3rem 0 1.1rem;
+}
+h1::after {
+  content: "";
+  display: block;
+  width: 2.4rem;
+  height: 4px;
+  margin-top: 0.55rem;
+  border-radius: 999px;
+  background: var(--degrade);
+}
+.lead {
+  color: var(--texte);
+  margin-bottom: 0.9rem;
+}
+.hint {
+  color: var(--texte-doux);
+  font-size: 0.88rem;
+}
+code {
+  font-family: var(--mono);
+  font-size: 0.88em;
+  background: var(--voile);
+  padding: 0.1em 0.35em;
+  border-radius: 6px;
+}
+a {
+  color: var(--accent);
+  text-underline-offset: 2px;
+}
+
+/* Titre de section : une barre d'accent plutôt qu'un simple gras — c'est ce qui découpe
+   visuellement la page sans ajouter une ligne de texte. */
+.carte h2 {
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--texte-faible);
+  margin: 2rem 0 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+.carte h2::before {
+  content: "";
+  width: 3px;
+  height: 0.95em;
+  border-radius: 2px;
+  background: var(--degrade);
+  flex: none;
+}
+.carte > h2:first-of-type {
+  margin-top: 1.2rem;
+}
+
+/* Liste des mesures du tableau de bord. Chaque ligne porte sa valeur, sa source et son
+   âge : une donnée sans provenance ni fraîcheur serait trompeuse ici, la fraîcheur réelle
+   du véhicule étant de 30 à 60 minutes. */
+.mesures {
+  list-style: none;
+  margin: 0.5rem 0 1.2rem;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+.mesures li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: "libelle valeur" "meta meta";
+  gap: 0.15rem 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--neutre) 8%, transparent);
+}
+.mesures .libelle {
+  grid-area: libelle;
+  font-weight: 600;
+}
+.mesures .valeur {
+  grid-area: valeur;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.mesures .meta {
+  grid-area: meta;
+  color: var(--texte-doux);
+  font-size: 0.8rem;
+}
+
+/* Onglets de navigation entre les écrans. L'onglet courant n'est pas un lien : rien à
+   cliquer, et le lecteur d'écran l'annonce via aria-current. */
+.onglets {
+  display: flex;
+  gap: 0.35rem;
+  margin: 0 0 1.1rem;
+  flex-wrap: wrap;
+}
+.onglets a,
+.onglets span {
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--texte-doux);
+  border: 1px solid var(--bordure);
+}
+.onglets span[aria-current="page"] {
+  color: var(--texte);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--neutre) 8%, transparent);
+}
+.onglets a:hover {
+  color: var(--texte);
+}
+
+/* Toutes les pages (Marc, 13/08 : « utilise tout l'espace à disposition ») — tableaux,
+   graphiques et cartes profitent tous d'une largeur qui suit le viewport plutôt qu'un
+   format téléphone centré. Le contenu qui dépasse défile dans son propre conteneur
+   (`.defilement`), jamais la page. */
+.carte-large {
+  max-width: 84rem;
+  width: 100%;
+}
+.carte h2 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 1.4rem 0 0.5rem;
+}
+/* L'icône de titre vient APRÈS la barre dégradée (`h2:before`) : elles ne se disputent pas
+   la place, le `display: flex` du h2 les aligne toutes les deux. */
+.carte h2 > svg {
+  flex: none;
+  color: var(--texte-faible);
+}
+.defilement {
+  overflow-x: auto;
+}
+.tableau {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+.tableau th,
+.tableau td {
+  text-align: left;
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid var(--bordure);
+  white-space: nowrap;
+}
+.tableau th {
+  color: var(--texte-doux);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.tableau .nombre {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Graphiques de l'onglet Analyse ET de l'accueil (`app/ui/Graphique.tsx`, partagé depuis
+   le 12/08) : SVG rendus côté serveur, couleur héritée du thème. Carte plus respirante
+   que le reste de l'écran — c'est elle qu'on regarde en premier. */
+.graphique {
+  margin: 0 0 1.4rem;
+}
+.graphique figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.1rem 0.5rem;
+}
+.graphique figcaption strong {
+  font-size: 1rem;
+}
+.graphique svg.graphe {
+  display: block;
+  width: 100%;
+  /* La carte est désormais bien plus large (`.carte-large`, 84rem) : une hauteur fixe à
+     190px aplatirait les courbes (`preserveAspectRatio="none"` les étire dans les deux
+     sens). `clamp` les garde lisibles en dessous et généreuses sur grand écran. */
+  height: clamp(190px, 22vw, 320px);
+  margin-top: 0.45rem;
+  border: 1px solid var(--bordure);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--neutre) 5%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--blanc) 3%, transparent);
+  color: var(--accent);
+}
+.graphique figcaption .meta {
+  color: var(--texte-doux);
+  font-size: 0.8rem;
+}
+
+/* Grille et lignes de référence des graphiques. Couleurs par TOKEN — thème sombre
+   assumé (décision Marc 17/08, voir l'en-tête du fichier). */
+.graphique .grille {
+  stroke: var(--bordure);
+  stroke-width: 1;
+}
+.graphique .ligne-allouee {
+  stroke: var(--texte-doux);
+  opacity: 0.55;
+}
+.graphique .ligne-projection {
+  stroke: var(--texte-doux);
+}
+.graphique .axes {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--texte-doux);
+  margin-top: 0.35rem;
+}
+
+/* Bloc de codes bruts (signaux à décocher) : il se lit en face de la console Smartcar,
+   donc il doit se sélectionner d'un bloc et ne jamais réécrire les codes à la main. */
+.codes {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  margin: 0.5rem 0 0.9rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--bordure);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--neutre) 8%, transparent);
+  overflow-x: auto;
+  white-space: pre;
+}
+
+/* Ce que le calcul ne sait PAS. Une projection dont la fenêtre de mesure est trop courte
+   doit le dire À L'ENDROIT où on lit le chiffre, pas dans un commentaire de code. */
+.limites {
+  list-style: none;
+  margin: 0.4rem 0 1rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--bordure);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--neutre) 6%, transparent);
+  color: var(--texte-doux);
+  font-size: 0.85rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+/* Tracé du trajet. Contrairement aux courbes, il garde son RATIO (pas de
+   preserveAspectRatio="none") : une carte étirée est une carte fausse. */
+.graphique svg.carte {
+  height: auto;
+  aspect-ratio: 600 / 320;
+}
+.point-actuel {
+  fill: var(--accent);
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+/* Frise d'états : l'état COURANT en gros, l'historique des bascules en dessous. Une
+   métrique booléenne n'a pas de hauteur — la tracer aurait été un faux graphique. */
+.etat-courant {
+  margin: 0.3rem 0 0.4rem;
+}
+.etat-courant .valeur {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+.bascules {
+  list-style: none;
+  margin: 0 0 0.6rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--neutre) 6%, transparent);
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+}
+
+/* Ce qui MANQUE et qui coûte quelque chose. Un champ vide au milieu de sept autres ne se
+   remarque pas ; ce bandeau nomme le manque et ce qu'il change. Il s'efface dès que le
+   champ est rempli — un avertissement permanent cesse d'être lu. */
+.bandeau-manque {
+  margin: 0.6rem 0 1rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--bordure);
+  border-left: 3px solid var(--alerte-texte);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--neutre) 6%, transparent);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+/* Sections repliées : ce sur quoi il n'y a plus rien à faire ne doit pas repousser hors
+   de l'écran ce qui compte. */
+.replie {
+  margin: 1.2rem 0 0.6rem;
+  border: 1px solid var(--bordure);
+  border-radius: 10px;
+  padding: 0.55rem 0.8rem;
+}
+.replie > summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--texte-doux);
+}
+.replie[open] > summary {
+  margin-bottom: 0.5rem;
+}
+
+/* Alertes. Une barre de couleur à gauche suffit à distinguer l'urgent du reste sans
+   remplir l'écran — et zéro alerte reste le cas normal, dit en une ligne discrète. */
+.alertes {
+  list-style: none;
+  margin: 0.3rem 0 1rem;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+.alertes li {
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--neutre) 8%, transparent);
+  border-left: 3px solid var(--bordure);
+  display: grid;
+  gap: 0.15rem;
+}
+.alertes li.alerte {
+  border-left-color: var(--erreur-bordure);
+}
+.alertes li.avertissement {
+  border-left-color: var(--alerte-bordure);
+}
+.alertes .titre {
+  font-weight: 700;
+}
+.alertes .meta {
+  color: var(--texte-doux);
+  font-size: 0.82rem;
+}
+
+/* La recommandation : une phrase, rendue seulement quand une action est à prendre. Même
+   barre à gauche que les alertes, au ton « attention » — c'est la réponse à l'une d'elles. */
+.recommandation {
+  margin: 0.3rem 0 0.75rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--neutre) 8%, transparent);
+  border-left: 3px solid var(--alerte-texte);
+  font-weight: 700;
+}
+
+/* LE VERDICT du bail : la première chose qu'on lit en ouvrant l'app. Gros, une seule
+   phrase, et une couleur qui dit le sens sans qu'on ait à lire le chiffre. */
+.verdict {
+  font-size: clamp(1.1rem, 0.9rem + 1.3vw, 1.45rem);
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+  margin: 0.2rem 0 0.9rem;
+}
+.verdict.alerte {
+  color: var(--erreur-clair);
+}
+.verdict.ok {
+  color: var(--succes-clair);
+}
+.verdict.neutre {
+  color: var(--texte);
+}
+
+/* Les composantes du verdict : ce qui permet de le vérifier soi-même. */
+.chiffres {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: 0.5rem;
+}
+.chiffres li {
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--neutre) 8%, transparent);
+  display: grid;
+  gap: 0.1rem;
+}
+.chiffres .etiquette {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--texte-doux);
+  font-weight: 600;
+}
+.chiffres .nombre {
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Le code technique du signal accompagne le libellé français sans lui voler la vedette :
+   dans un tableau on cherche « Charge de la batterie », pas
+   « tractionbattery-stateofcharge ». */
+.code-discret {
+  display: block;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.7rem;
+  color: var(--texte-doux);
+}
+
+/* Tableau type tableur : lignes alternées et en-tête collant, pour suivre les colonnes
+   quand on fait défiler des centaines de mesures. */
+.tableau tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--neutre) 5%, transparent);
+}
+.tableau thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 1;
+}
+.defilement {
+  max-height: 70vh;
+  overflow: auto;
+}
+
+/* Carte à tuiles OSM : une grille d'<img> et un calque SVG au-dessus, tous deux
+   positionnés en POURCENTAGE du cadre — c'est ce qui permet à la carte d'être fluide
+   (elle se redimensionne) alors que les tuiles font 256 px fixes. */
+.carte-osm {
+  margin: 0.5rem 0 0.4rem;
+}
+.carte-cadre {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--bordure);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--neutre) 8%, transparent);
+}
+.carte-cadre .tuile-osm {
+  position: absolute;
+  /* ⚠️ La largeur est posée EN LIGNE par `Carte.tsx`, dérivée de `vue.largeur`. Elle valait
+     ici `calc(256 / 640 * 100%)` — la taille de composition écrite en dur : composer à une
+     autre taille décalait alors toutes les tuiles, en silence. */
+  height: auto;
+  /* Les tuiles OSM sont conçues pour un fond clair. En thème sombre, on les assombrit
+     légèrement plutôt que d'éblouir — sans les inverser, ce qui rendrait les rues fausses. */
+  user-select: none;
+}
+.carte-cadre .tuile-osm {
+  filter: brightness(0.82) contrast(1.05);
+}
+.carte-cadre .calque {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.carte-cadre .trace-fond {
+  stroke: color-mix(in srgb, var(--blanc) 85%, transparent);
+}
+.carte-cadre .trace {
+  stroke: var(--erreur-vif);
+}
+/* Chemin NON enregistré : le trait relie deux relevés sans dire par où on est passé.
+   Le pointillé est la seule façon honnête de le dessiner — un trait plein affirmerait
+   une route que la voiture n'a jamais déclarée (« ça devrait pas faire vol d'oiseau »). */
+.carte-cadre .trace-devinee {
+  stroke-dasharray: 2 9;
+  opacity: 0.85;
+}
+.carte-cadre .pt-etape {
+  fill: var(--erreur-vif);
+  stroke: white;
+  stroke-width: 1.5;
+}
+.carte-cadre .pt-depart {
+  fill: var(--succes-profond);
+  stroke: white;
+  stroke-width: 2;
+}
+.carte-cadre .pt-arrivee {
+  fill: var(--erreur-vif);
+  stroke: white;
+  stroke-width: 2;
+}
+.pastille {
+  display: inline-block;
+  width: 0.6em;
+  height: 0.6em;
+  border-radius: 50%;
+  margin: 0 0.15em 0 0.4em;
+  vertical-align: baseline;
+}
+.pastille.depart {
+  background: var(--succes-profond);
+}
+.pastille.arrivee {
+  background: var(--erreur-vif);
+}
+
+/* Concordance : le total reconstitué face au compteur de la voiture. C'est une
+   VÉRIFICATION, pas une décoration — elle est encadrée pour qu'on la lise avant le détail. */
+.concordance {
+  margin: 0.9rem 0 1.1rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--bordure);
+  border-left: 3px solid var(--erreur-vif);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--neutre) 6%, transparent);
+}
+.concordance p {
+  margin: 0;
+}
+.concordance p + p {
+  margin-top: 0.45rem;
+}
+.concordance code {
+  font-size: 0.85em;
+}
+
+/* Journal des trajets. Chaque ligne doit se lire d'un coup d'œil : quand, combien,
+   combien de temps, et le lien vers l'itinéraire. */
+.journee {
+  margin: 1.4rem 0;
+}
+.journee h2 {
+  margin-bottom: 0.4rem;
+  text-transform: capitalize;
+}
+.journee h2 .meta {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--texte-doux);
+  text-transform: none;
+}
+/* Une distance issue des relevés GPS est une BORNE INFÉRIEURE : le dire au chiffre même,
+   pas dans une note qu'on ne relie plus au nombre qu'on lit. */
+/* Barre de filtres du tableau : un formulaire GET — lisible, partageable, sans JS. */
+.filtres {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 1rem;
+  margin: 0.4rem 0 0.9rem;
+  font-size: 0.88rem;
+}
+.filtres label {
+  color: var(--texte-doux);
+  font-weight: 600;
+}
+.filtres select,
+.filtres button {
+  font: inherit;
+  color: var(--texte);
+  background: var(--surface);
+  border: 1px solid var(--bordure);
+  border-radius: 8px;
+  padding: 0.3rem 0.55rem;
+}
+.filtres button {
+  cursor: pointer;
+  font-weight: 600;
+}
+.filtres a {
+  font-weight: 600;
+}
+
+/* ══ SCHÉMA DU VÉHICULE (onglet Analyse) ═══════════════════════════════════════════════
+   Marc, 13/08 : « des images pour les pneus ». Le schéma et les chiffres côte à côte —
+   l'un répond à « est-ce normal ? », l'autre à « combien ? ». Empilés, on perdrait le
+   coup d'œil qui justifie l'image. */
+.panneau-etat {
+  display: grid;
+  grid-template-columns: minmax(200px, 280px) 1fr;
+  gap: clamp(1rem, 3vw, 2.5rem);
+  align-items: start;
+  margin: 0.4rem 0 1.4rem;
+}
+@media (max-width: 700px) {
+  .panneau-etat {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+  .panneau-cote {
+    width: 100%;
+  }
+}
+.panneau-cote {
+  display: grid;
+  gap: 0.7rem;
+  align-content: start;
+}
+
+/* ── LA VOITURE : un RENDU 3D, plus un calque d'état ────────────────────────────────────
+   Le dessin au trait (`.schema-vehicule`, ~160 lignes de SVG stylé) a été retiré avec lui :
+   plus aucun élément ne portait ses classes, et du CSS mort dans CE fichier n'est pas
+   neutre — c'est ici que deux règles orphelines ont déjà écrasé en silence une mise en page
+   entière (voir le bloc « ICI VIVAIT UNE SECONDE PASSE DE DENSITÉ »).
+
+   Le calque se superpose EXACTEMENT à l'image : même rapport, même origine. C'est ce qui
+   autorise à exprimer roues et ouvrants en pourcentage du cadre. */
+.voiture {
+  position: relative;
+  display: block;
+  width: 100%;
+  max-width: 22rem;
+  margin-inline: auto;
+}
+.voiture-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  /* Le rendu vient d'un studio sombre : une ombre portée douce le POSE sur le fond au lieu
+     de le laisser flotter. Elle est en CSS, pas cuite dans le PNG, pour suivre le thème. */
+  filter: drop-shadow(0 18px 26px color-mix(in srgb, var(--noir) 55%, transparent));
+}
+.voiture-calque {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+/* ⚠️ L'ÉTAT VIT DANS LE CONTOUR. Un aplat de couleur sur une photo recouvre le pneu qu'il
+   décrit, et crie plus fort que le chiffre qu'on vient lire. */
+.voiture-calque .v-roue {
+  fill: none;
+  stroke-width: 7;
+}
+.voiture-calque .v-roue.ok {
+  stroke: color-mix(in srgb, var(--succes-texte) 50%, transparent);
+}
+.voiture-calque .v-roue.surveiller {
+  stroke: var(--alerte-texte);
+}
+.voiture-calque .v-roue.alerte {
+  stroke: var(--erreur-texte);
+}
+/* Sans mesure : gris pointillé, JAMAIS vert — une roue verte se lit « tout va bien ». */
+.voiture-calque .v-roue.inconnu {
+  stroke: var(--inconnu);
+  stroke-dasharray: 14 11;
+}
+
+/* Un ouvrant fermé est la normalité : il reste discret. C'est l'ouvert qui doit sauter
+   aux yeux, d'où le halo. */
+.voiture-calque .v-ouvrant.ferme {
+  fill: color-mix(in srgb, var(--neutre-clair) 35%, transparent);
+}
+.voiture-calque .v-ouvrant.ouvert {
+  fill: var(--alerte-texte);
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--alerte-texte) 90%, transparent));
+}
+
+
+.verdict-schema {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+.verdict-schema.ok {
+  color: var(--succes-texte);
+}
+.verdict-schema.neutre {
+  color: var(--texte-doux);
+}
+
+/* Légende du schéma et légende des séries : même forme, pour qu'une pastille veuille
+   toujours dire la même chose d'un écran à l'autre. */
+.legende-schema,
+.legende {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  font-size: 0.8rem;
+  color: var(--texte-doux);
+}
+.legende {
+  margin-top: 0.5rem;
+}
+.legende li,
+.legende-schema li {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.legende strong {
+  color: var(--texte);
+  font-variant-numeric: tabular-nums;
+}
+.legende .pastille,
+.legende-schema .pastille {
+  display: inline-block;
+  width: 0.7em;
+  height: 0.7em;
+  border-radius: 3px;
+  margin: 0;
+  vertical-align: baseline;
+  flex: none;
+}
+.legende-schema .etat-ok {
+  background: var(--succes-texte);
+}
+.legende-schema .etat-surveiller {
+  background: var(--alerte-texte);
+}
+.legende-schema .etat-alerte {
+  background: var(--erreur-texte);
+}
+.legende-schema .etat-inconnu {
+  background: var(--inconnu);
+}
+
+/* Quatre séries sur un axe commun : la couleur est le SEUL moyen de les distinguer, elle
+   doit donc être identique dans le tracé et dans la légende. */
+.serie-0 {
+  stroke: var(--serie-0);
+}
+.serie-1 {
+  stroke: var(--serie-1);
+}
+.serie-2 {
+  stroke: var(--serie-2);
+}
+.serie-3 {
+  stroke: var(--serie-3);
+}
+.legende .serie-0 {
+  background: var(--serie-0);
+}
+.legende .serie-1 {
+  background: var(--serie-1);
+}
+.legende .serie-2 {
+  background: var(--serie-2);
+}
+.legende .serie-3 {
+  background: var(--serie-3);
+}
+
+/* CE QUE LA COURBE DIT — une phrase sous le graphique, jamais un paragraphe. Marquée
+   visuellement pour se distinguer d'une note technique. */
+.explication {
+  margin-top: 0.5rem;
+  font-size: 0.88rem;
+  color: var(--texte-doux);
+  border-left: 2px solid var(--accent);
+  padding-left: 0.65rem;
+  max-width: 62ch;
+}
+
+/* ══ RÉGLAGES — les chiffres du contrat, saisis par Marc ══════════════════════════════
+   Champs larges et aide SOUS le champ : ce sont des valeurs qu'on recopie d'une facture
+   ou d'un contrat papier, pas des cases qu'on coche de mémoire. */
+.reglages {
+  display: grid;
+  gap: 1.2rem;
+  margin: 0.5rem 0 1rem;
+  max-width: 46rem;
+}
+.reglages fieldset {
+  border: 1px solid var(--bordure);
+  border-left: 3px solid var(--accent);
+  border-radius: 10px;
+  padding: 0.9rem 1.1rem 1.1rem;
+  display: grid;
+  gap: 0.9rem;
+  min-width: 0;
+}
+.reglages legend {
+  font-weight: 700;
+  font-size: 0.9rem;
+  padding: 0 0.4rem;
+}
+.reglages label {
+  display: grid;
+  gap: 0.25rem;
+}
+.reglages .etiquette-champ {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.reglages input {
+  font: inherit;
+  color: var(--texte);
+  background: var(--surface);
+  border: 1px solid var(--bordure);
+  border-radius: 8px;
+  padding: 0.45rem 0.6rem;
+  max-width: 22rem;
+}
+.reglages input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.reglages .aide {
+  color: var(--texte-doux);
+  font-size: 0.82rem;
+  max-width: 60ch;
+}
+.reglages button {
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--surface);
+  background: var(--accent);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 0.5rem 1.1rem;
+  justify-self: start;
+}
+
+/* ══ SURVOL DES GRAPHIQUES (Marc, 13/08 : « glisser la souris pour voir les valeurs ») ══
+   Tout est en CSS : une bande survolée révèle sa ligne, sa pastille et sa bulle. Aucun JS,
+   donc rien à hydrater — le graphique reste du HTML rendu par le serveur. */
+.graphique-zone {
+  position: relative;
+}
+.survol,
+.couche-survol {
+  position: absolute;
+  inset: 0;
+  /* Le SVG a une marge haute (`margin-top` sur .graphique svg) : la couche doit s'aligner
+     sur le CADRE, pas sur le conteneur. */
+  top: 0.45rem;
+}
+.survol .bande {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  cursor: crosshair;
+}
+/* Repère vertical : discret au repos (invisible), net au survol. */
+.survol .repere-v,
+.survol .pastille-survol,
+.survol .bulle {
+  opacity: 0;
+  transition: opacity 90ms ease-out;
+  pointer-events: none;
+}
+.survol .bande:hover .repere-v,
+.survol .bande:hover .pastille-survol,
+.survol .bande:hover .bulle {
+  opacity: 1;
+}
+.survol .repere-v {
+  position: absolute;
+  left: var(--x);
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--accent);
+}
+.survol .pastille-survol {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  transform: translate(-50%, -50%);
+}
+.survol .bulle {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  transform: translate(0.6rem, -50%);
+  display: grid;
+  gap: 0.05rem;
+  padding: 0.3rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid var(--bordure);
+  background: var(--surface);
+  box-shadow: 0 4px 14px -6px color-mix(in srgb, var(--noir) 35%, transparent);
+  font-size: 0.8rem;
+  line-height: 1.35;
+  white-space: nowrap;
+  z-index: 2;
+}
+/* Près du bord droit, la bulle bascule à gauche du repère — sinon elle sortirait du cadre
+   et le dernier relevé, celui qu'on regarde le plus, serait le seul illisible. */
+.survol .bulle.vers-gauche {
+  transform: translate(calc(-100% - 0.6rem), -50%);
+}
+.survol .bulle strong {
+  font-variant-numeric: tabular-nums;
+}
+.survol .quand-bulle {
+  color: var(--texte-doux);
+  font-size: 0.74rem;
+}
+
+/* Sur les séries superposées, chaque couche prend la couleur de SA série : la bulle qui
+   apparaît doit se rattacher sans ambiguïté à la courbe survolée. */
+.couche-survol .repere-v,
+.couche-survol .pastille-survol {
+  background: currentColor;
+}
+.couche-survol.serie-0 {
+  color: var(--serie-0);
+}
+.couche-survol.serie-1 {
+  color: var(--serie-1);
+}
+.couche-survol.serie-2 {
+  color: var(--serie-2);
+}
+.couche-survol.serie-3 {
+  color: var(--serie-3);
+}
+
+/* ══ SÉLECTEUR DE FENÊTRE — raccourcis, plage, ou tout ════════════════════════════════ */
+.selecteur-fenetre {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0.3rem 0 1rem;
+}
+.raccourcis {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.raccourcis a,
+.raccourcis span {
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--texte-doux);
+  border: 1px solid var(--bordure);
+}
+.raccourcis span[aria-current="true"] {
+  color: var(--texte);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--neutre) 8%, transparent);
+}
+.filtres input[type="date"] {
+  font: inherit;
+  color: var(--texte);
+  background: var(--surface);
+  border: 1px solid var(--bordure);
+  border-radius: 8px;
+  padding: 0.28rem 0.5rem;
+}
+.fenetre-active {
+  font-size: 0.9rem;
+  color: var(--texte-doux);
+}
+.fenetre-active .avertissement {
+  color: var(--alerte-texte);
+}
+
+/* ══ DÉDUCTIONS — les tuiles n'apparaissent QUE si leur déduction a tenu ══════════════ */
+.deduction {
+  margin: 0 0 1.1rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--bordure);
+  border-left: 3px solid var(--accent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--neutre) 5%, transparent);
+}
+.deduction-titre {
+  font-size: 1rem;
+  line-height: 1.4;
+}
+.deduction .explication {
+  border-left: none;
+  padding-left: 0;
+  margin-top: 0.35rem;
+}
+.deduction .limites {
+  margin: 0.5rem 0 0;
+}
+
+/* Barres horizontales : les kilomètres par jour de semaine. Pas un SVG — une liste de
+   barres proportionnelles reste lisible au lecteur d'écran, qui lit les valeurs. */
+.barres {
+  list-style: none;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+.barres li {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr 4rem;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+}
+.barre-libelle {
+  color: var(--texte-doux);
+}
+.barre-piste {
+  height: 0.75rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--neutre) 12%, transparent);
+  overflow: hidden;
+}
+.barre-remplissage {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  min-width: 2px;
+}
+.barre-valeur {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+/* ══ LE HÉROS DE L'ACCUEIL — ce qu'on voit avant de lire ══════════════════════════════
+   Marc, 13/08 : « dans l'onglet accueil je veux que ce soit très visuel, quasiment pas de
+   texte ». Le verdict du bail en très gros, les cadrans à côté, la voiture dessous. */
+/* Le verdict : la plus grosse chose de l'écran, parce que c'est la seule qui engage de
+   l'argent. Un chiffre de cette taille se lit sans être lu. */
+.verdict-geant {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.verdict-nombre {
+  font-size: clamp(2.2rem, 1.3rem + 5vw, 3.7rem);
+  font-weight: 850;
+  letter-spacing: -0.045em;
+  line-height: 0.95;
+  font-variant-numeric: tabular-nums;
+  background: var(--degrade);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.verdict-nombre.alerte {
+  background: linear-gradient(135deg, var(--erreur-texte), var(--erreur-orange));
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+.verdict-nombre.ok {
+  background: linear-gradient(135deg, var(--succes-texte), var(--succes-turquoise));
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+.verdict-legende {
+  font-size: 0.95rem;
+  color: var(--texte-doux);
+  font-weight: 600;
+}
+.verdict-appui {
+  font-size: 0.85rem;
+  color: var(--texte-faible);
+}
+
+/* ══ CADRANS ═════════════════════════════════════════════════════════════════════════ */
+.cadrans {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+  gap: 0.75rem;
+  justify-items: center;
+}
+.jauge {
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  min-width: 0;
+}
+.jauge svg {
+  width: clamp(4.25rem, 7.5vw, 5.9rem);
+  height: auto;
+  display: block;
+}
+/* ⚠️ La piste doit rester VISIBLE derrière le remplissage. À 100 % l'arc couvre tout le
+   cercle : sans contraste, un anneau PLEIN et un anneau VIDE se ressemblent trait pour
+   trait — c'est ce que montrait la capture de Marc du 19/08, où « 100 % » avait l'air d'un
+   contour vide. Une piste plus épaisse que le remplissage laisse un liseré tout autour :
+   le plein se lit alors comme un plein. */
+.jauge .piste {
+  fill: none;
+  stroke: var(--voile);
+  stroke-width: 13;
+}
+.jauge .remplissage {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 11;
+  stroke-linecap: round;
+}
+.jauge.ton-ok .remplissage {
+  stroke: var(--succes-texte);
+}
+.jauge.ton-attention .remplissage {
+  stroke: var(--alerte-texte);
+}
+.jauge.ton-danger .remplissage {
+  stroke: var(--erreur-texte);
+}
+.jauge.sans-mesure .piste {
+  stroke-dasharray: 5 6;
+  stroke: var(--inconnu);
+  opacity: 0.6;
+}
+.jauge figcaption {
+  display: grid;
+  justify-items: center;
+  gap: 0.05rem;
+  text-align: center;
+}
+.jauge-valeur {
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+.jauge-libelle {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  color: var(--texte-faible);
+}
+.jauge-detail {
+  font-size: 0.72rem;
+  color: var(--texte-faible);
+}
+
+/* ══ BARRE À PLAFOND — pour ce qui peut DÉPASSER ═════════════════════════════════════ */
+.barre-plafond {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0 0 1rem;
+}
+.barre-entete {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.barre-titre {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  color: var(--texte-faible);
+}
+.barre-chiffres {
+  font-size: 0.85rem;
+  color: var(--texte-doux);
+  font-variant-numeric: tabular-nums;
+}
+.barre-chiffres strong {
+  color: var(--texte);
+  font-size: 1rem;
+}
+.barre-piste-large {
+  display: flex;
+  height: 0.6rem;
+  border-radius: 999px;
+  background: var(--voile);
+  overflow: hidden;
+}
+.barre-dedans {
+  background: var(--degrade);
+}
+/* Le dépassement se peint PAR-DESSUS, en danger : la barre pleine ne suffirait pas à dire
+   qu'on est allé au-delà. */
+.barre-dehors {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--erreur-texte),
+    var(--erreur-texte) 4px,
+    var(--erreur-rayure) 4px,
+    var(--erreur-rayure) 8px
+  );
+}
+.ton-alerte .barre-dedans {
+  background: linear-gradient(135deg, var(--erreur-texte), var(--erreur-orange));
+}
+
+/* ══ TUILES — la grille « bento » de l'accueil ═══════════════════════════════════════ */
+.tuiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  gap: 0.7rem;
+  margin: 0 0 1.4rem;
+}
+.tuile {
+  padding: 0.85rem 1rem;
+  border-radius: var(--rayon);
+  background: var(--surface-douce);
+  border: 1px solid var(--bordure);
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.tuile-valeur {
+  font-size: clamp(1.15rem, 0.95rem + 1vw, 1.5rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.tuile-icone {
+  color: var(--texte-faible);
+  display: grid;
+  place-items: center;
+  justify-self: start;
+  margin-bottom: 0.15rem;
+}
+.tuile.accent .tuile-icone { color: var(--accent); }
+.tuile.alerte .tuile-icone { color: var(--erreur-texte); }
+.tuile.ok .tuile-icone { color: var(--succes-texte); }
+.tuile-libelle {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  color: var(--texte-faible);
+}
+.tuile-detail {
+  font-size: 0.75rem;
+  color: var(--texte-faible);
+}
+
+/* ⚠️ LA PART ESTIMÉE A SA PROPRE LIGNE, et c'est tout le lot du 15/09.
+   Avant : « 20 $ + ~30 $ » dans la valeur de la tuile — deux montants collés, que
+   Marc a nommés comme son irritant. Les fondre en un seul total était exclu (`totaliserPrix`
+   l'interdit, et l'estimé fait 60 % du tout sur un jeu typique) : la lisibilité vient
+   donc de la MISE EN PAGE. Le chiffre sûr garde la taille de la valeur, la supposition
+   descend d'un cran et prend la couleur des textes faibles. */
+.tuile-estime {
+  font-size: 0.82rem;
+  color: var(--texte-faible);
+  font-variant-numeric: tabular-nums;
+  margin-top: -0.15rem;
+}
+
+/* Le détail d'une recharge — une LISTE, pas un tableau : quatre champs dont deux longs
+   (le lieu, l'explication du prix) ne tiennent pas en colonnes sur 360 px, et le lot
+   Données a mesuré ce que coûte un tableau qui déborde. */
+.liste-sessions {
+  list-style: none;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+.liste-sessions li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.15rem 0.6rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--bordure);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.ls-quand {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.ls-montant {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  align-self: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.ls-lieu {
+  font-size: 0.82rem;
+  color: var(--texte-faible);
+}
+.ls-detail {
+  grid-column: 1 / -1;
+  font-size: 0.78rem;
+  color: var(--texte-faible);
+}
+.tuile.accent .tuile-valeur {
+  color: var(--accent);
+}
+.tuile.alerte .tuile-valeur {
+  color: var(--erreur-texte);
+}
+.tuile.ok .tuile-valeur {
+  color: var(--succes-texte);
+}
+
+/* Onglets : des pastilles qui se détachent, et l'actif qui porte l'accent en fond plutôt
+   qu'une simple bordure — c'est ce qui se repère sans lire. */
+.onglets {
+  display: flex;
+  gap: 0.3rem;
+  margin: 0 0 1.2rem;
+  flex-wrap: wrap;
+}
+.onglets a,
+.onglets span {
+  padding: 0.32rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.83rem;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--texte-doux);
+  border: 1px solid transparent;
+  background: var(--voile);
+  transition: color 120ms, background 120ms;
+}
+.onglets a:hover {
+  color: var(--texte);
+  background: var(--accent-voile);
+}
+.onglets span[aria-current="page"] {
+  color: var(--surface);
+  background: var(--degrade);
+  border-color: transparent;
+}
+.onglets span[aria-current="page"] {
+  color: var(--sur-accent);
+}
+
+/* Pied de page : les gestes rares, discrets mais toujours atteignables. */
+.pied {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--bordure);
+  font-size: 0.82rem;
+  color: var(--texte-faible);
+}
+
+/* ══ TRAJETS — une FRISE plutôt qu'un tableau (Marc, 13/08 : « amélioration visuelle et
+   pratique »). Une journée se lit de haut en bas, chaque trajet accroché à un fil, et la
+   distance devient une barre : on repère le long trajet sans lire un chiffre. */
+.journee {
+  margin: 1.6rem 0;
+}
+.journee h2 {
+  text-transform: capitalize;
+  letter-spacing: -0.01em;
+  font-size: 1rem;
+  color: var(--texte);
+}
+.journee h2::before {
+  height: 1.1em;
+}
+.journee h2 .meta {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--texte-faible);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* ══ GRAPHIQUE À DEUX ÉCHELLES ═══════════════════════════════════════════════════════
+   Les deux unités s'écrivent à LEUR bord — c'est ce qui empêche de lire les deux courbes
+   sur une échelle commune, ce qu'elles ne partagent pas. */
+.axes-double {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.axes-double .echelle-gauche {
+  color: var(--serie-0);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.axes-double .echelle-droite {
+  color: var(--serie-1);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.axes-double .meta {
+  text-align: center;
+}
+/* La pastille de la série TIRETÉE reprend son motif : la légende doit ressembler au trait
+   qu'elle nomme, sinon il faut deviner lequel est lequel. */
+.legende .pastille.tiretee {
+  background: repeating-linear-gradient(
+    90deg,
+    currentColor 0 4px,
+    transparent 4px 7px
+  );
+}
+
+/* ══ COMMANDES ═══════════════════════════════════════════════════════════════════════
+   Le seul écran de CarAI qui ÉCRIT dans le monde plutôt que de lire une base. Ce qui a
+   un effet physique est visuellement à part — pas plus gros, à part : un bouton rouge
+   parmi cinq boutons rouges ne prévient plus de rien. */
+.commandes {
+  list-style: none;
+  margin: 0.6rem 0 1.4rem;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 0.7rem;
+}
+.commandes li {
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon);
+  background: var(--surface-douce);
+  min-width: 0;
+}
+/* L'action physique porte une bordure d'alerte AVANT même qu'on la lise. */
+.commandes li.physique {
+  border-color: var(--erreur-texte);
+  background: color-mix(in srgb, var(--erreur-texte) 5%, transparent);
+}
+.commandes form {
+  display: grid;
+  gap: 0.55rem;
+}
+.commande-titre {
+  display: grid;
+  gap: 0.15rem;
+}
+.commande-titre .meta {
+  font-size: 0.78rem;
+  color: var(--texte-doux);
+  line-height: 1.35;
+}
+.commande-champ {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+}
+.commande-champ input {
+  width: 5rem;
+}
+.commande-confirmation {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: var(--erreur-texte);
+  font-weight: 600;
+}
+.commandes button {
+  justify-self: start;
+}
+.commandes button.danger {
+  background: var(--erreur-texte);
+  border-color: var(--erreur-texte);
+  color: white;
+}
+
+/* Le résultat de la dernière commande, et les statuts du journal. « Sort inconnu » porte
+   la teinte ATTENTION et non danger : on ne sait pas si la voiture a reçu l'ordre, ce qui
+   n'est pas la même chose qu'un refus. */
+.resultat-ok {
+  border-left: 3px solid var(--succes-texte);
+  padding-left: 0.7rem;
+}
+.resultat-attention {
+  border-left: 3px solid var(--alerte-texte);
+  padding-left: 0.7rem;
+}
+.resultat-danger {
+  border-left: 3px solid var(--erreur-texte);
+  padding-left: 0.7rem;
+}
+.statut-ok {
+  color: var(--succes-texte);
+  font-weight: 600;
+}
+.statut-attention {
+  color: var(--alerte-texte);
+  font-weight: 600;
+}
+.statut-danger {
+  color: var(--erreur-texte);
+  font-weight: 600;
+}
+
+/* ══ PRIX DES RECHARGES : mesuré vs estimé ═══════════════════════════════════════════
+   Marc a demandé les estimations en sachant qu'elles ne sont pas mesurées. Le compromis
+   tenu : elles existent, mais on doit les DISTINGUER d'un coup d'œil — sinon elles
+   contaminent la lecture de tout l'écran. */
+.prix-mesure {
+  font-weight: 700;
+}
+.prix-estime {
+  color: var(--texte-doux);
+  font-style: italic;
+}
+.prix-inconnu {
+  color: var(--texte-faible);
+}
+
+/* ══ LIEUX DE RECHARGE (Réglages) ════════════════════════════════════════════════════ */
+.liste-lieux {
+  list-style: none;
+  margin: 0.5rem 0 1rem;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+.liste-lieux li {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--bordure);
+  border-radius: 10px;
+  background: var(--surface-douce);
+}
+.lieu-nom {
+  font-weight: 700;
+}
+.lieu-tarif {
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  font-weight: 600;
+}
+.lien-bouton {
+  background: none;
+  border: none;
+  color: var(--erreur-texte);
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+  text-decoration: underline;
+  margin-left: auto;
+}
+
+/* ══ CARTE INTERACTIVE (app/ui/CarteInteractive.tsx) ═════════════════════════════════ */
+.carte-interactive .calque-actif {
+  cursor: grab;
+  touch-action: none; /* sinon le navigateur défile la page au lieu de déplacer la carte */
+}
+.carte-interactive .calque-actif:active {
+  cursor: grabbing;
+}
+.carte-interactive .tuile-osm {
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.carte-interactive .cible {
+  fill: transparent;
+  stroke: none;
+  cursor: pointer;
+  pointer-events: all;
+}
+.carte-interactive .pt-choisi {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+.carte-boutons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+.carte-boutons button {
+  font: inherit;
+  font-size: 0.88rem;
+  padding: 0.25rem 0.8rem;
+  min-width: 2.4rem;
+  border-radius: 999px;
+  border: 1px solid var(--bordure);
+  background: var(--surface);
+  color: var(--texte);
+  cursor: pointer;
+}
+.carte-boutons button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+.carte-boutons button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.carte-detail {
+  margin-top: 0.6rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--bordure);
+  border-radius: 12px;
+  background: var(--surface);
+  display: grid;
+  gap: 0.4rem;
+}
+.carte-detail dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.4rem 0.9rem;
+  margin: 0;
+}
+.carte-detail dt {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--texte-doux);
+}
+.carte-detail dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ══ CHARGE EN COURS (app/recharges/page.tsx) ════════════════════════════════════════
+   Le seul bloc de cette page qui périme. La bordure gauche change de teinte selon la
+   FIABILITÉ de l'estimation : une extrapolation au-dessus de 80 % n'a pas le même poids
+   qu'un rythme mesuré sur une heure pleine, et l'œil doit le voir avant de lire. */
+.en-cours {
+  border: 1px solid var(--bordure);
+  border-left: 4px solid var(--serie-2);
+  border-radius: 12px;
+  padding: 0.9rem 1rem;
+  margin-bottom: 1rem;
+  background: var(--surface);
+  display: grid;
+  gap: 0.6rem;
+}
+.en-cours[data-fiabilite="grossiere"] {
+  border-left-color: var(--serie-3);
+}
+.en-cours[data-fiabilite="optimiste"] {
+  border-left-color: var(--serie-4);
+}
+.en-cours h2 {
+  font-size: 1.05rem;
+  margin: 0;
+}
+.ec-chiffres {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: 0.5rem 1rem;
+  margin: 0;
+}
+.ec-chiffres dt {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--texte-doux);
+}
+.ec-chiffres dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.ec-chiffres dd.gros {
+  font-size: 1.3rem;
+  font-weight: 600;
+}
+.ec-reserves {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.84rem;
+  color: var(--texte-doux);
+  display: grid;
+  gap: 0.15rem;
+}
+
+/* ══ COURBES ZOOMABLES LIÉES (app/ui/GraphiquesLies.tsx) ═════════════════════════════
+   Demande de Marc du 14/08 : heures visibles, échelle étiquetée, zoom, couleurs qui
+   « paraissent pro ». Palette en hexadécimal comme le reste du socle : une teinte par série, choisies
+   à CLARTÉ voisine pour qu'aucune ne domine, calibrées pour le fond sombre assumé. */
+:root {
+  --serie-0: #899aff; /* violet — l'accent du produit */
+  --serie-1: #00c6ce; /* cyan profond */
+  --serie-2: #68ca80; /* vert */
+  --serie-3: #eeb154; /* ambre */
+  --serie-4: #f47b74; /* corail */
+  --serie-5: #d285cb; /* magenta */
+  --grille: #2a2e36;
+  --grille-jour: #3d424d;
+}
+
+.graphiques-lies {
+  display: grid;
+  gap: 1.25rem;
+}
+
+/* ── Contrôle de temps : UN seul, il gouverne toutes les courbes ── */
+.controle-temps {
+  background: var(--surface);
+  border: 1px solid var(--bordure);
+  border-radius: 14px;
+  padding: 0.85rem 1rem;
+  display: grid;
+  gap: 0.7rem;
+  position: sticky;
+  top: 0.5rem;
+  z-index: 2;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--noir) 4%, transparent), 0 10px 24px -18px color-mix(in srgb, var(--noir) 25%, transparent);
+}
+.ct-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem 0.6rem;
+  font-size: 0.92rem;
+}
+.ct-info .fleche {
+  color: var(--texte-doux);
+}
+.ct-brosse {
+  display: grid;
+  gap: 0.3rem;
+}
+.ct-brosse input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+  cursor: ew-resize;
+}
+.ct-boutons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.ct-boutons button {
+  font: inherit;
+  font-size: 0.88rem;
+  padding: 0.3rem 0.85rem;
+  min-width: 2.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--bordure);
+  background: var(--fond);
+  color: var(--texte);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.ct-boutons button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+.ct-boutons button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ══ LE CONTRÔLE DE TEMPS SUR TÉLÉPHONE ════════════════════════════════════════════════
+   C'est LE geste de cet écran : on glisse deux curseurs pour cadrer la période, puis on
+   tape +, −, Tout ou 24 h. Mesuré au banc Chromium à 360 et 390 px, sur le VRAI
+   `globals.css` et le balisage exact de `ControleTemps` :
+     · les deux curseurs faisaient **16 px de haut** — on glisse au doigt une cible trois
+       fois trop fine ;
+     · les quatre boutons faisaient **34,1 px**, le minimum tenable étant 44.
+
+   ⚠️ ET IL EST `sticky`, CE QUI CHANGE LE CALCUL. Collé en haut, il occupait déjà
+   **195 px sur 844**, soit 23 % de l'écran en permanence pendant qu'on lit les courbes.
+   Agrandir ses cibles à 44 px le porte à ~260 px : **31 %**. Un contrôle qui mange le
+   tiers de l'écran coûte plus qu'il ne rend — on le décolle donc sur téléphone, et on
+   garde les cibles. Ce que le collage apportait (zoomer en regardant une courbe plus bas)
+   se paie ici trop cher ; ce qu'il ne portait PAS, c'est l'échelle commune — elle vient du
+   composant, qui pilote toutes les courbes, pas de la position du bloc.
+
+   Le desktop ne bouge pas : tout est sous le media query, et ce bloc vient APRÈS les
+   règles de base qu'il surcharge (un media query n'ajoute aucune spécificité — le piège de
+   cascade que ce fichier a déjà payé plusieurs fois). */
+@media (max-width: 700px) {
+  .controle-temps {
+    position: static;
+  }
+  /* La zone de frappe couvre toute la hauteur du champ : cliquer n'importe où dessus agit
+     sur le curseur. La poignée garde son rendu natif — la styliser en `-webkit-` obligerait
+     à repeindre aussi la piste, pour un gain tactile nul. */
+  .ct-brosse input[type="range"] {
+    min-height: 44px;
+  }
+  .ct-boutons button {
+    min-height: 44px;
+    padding-inline: 1rem;
+  }
+}
+
+/* ── Une courbe ── */
+.courbe {
+  background: var(--surface);
+  border: 1px solid var(--bordure);
+  border-radius: 14px;
+  padding: 0.9rem 1rem 1rem;
+  /* `currentColor` porte la teinte de la série : le tracé, l'aire et la puce d'analyse
+     la reprennent sans qu'on la répète à quatre endroits. */
+  color: var(--serie-0);
+}
+.courbe[data-teinte="1"] { color: var(--serie-1); }
+.courbe[data-teinte="2"] { color: var(--serie-2); }
+.courbe[data-teinte="3"] { color: var(--serie-3); }
+.courbe[data-teinte="4"] { color: var(--serie-4); }
+.courbe[data-teinte="5"] { color: var(--serie-5); }
+
+.courbe figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.courbe figcaption strong {
+  color: var(--texte);
+  font-size: 1rem;
+}
+.courbe .trace {
+  display: block;
+  width: 100%;
+  height: auto;
+  touch-action: pan-y;
+}
+.courbe .grille {
+  stroke: var(--grille);
+  stroke-width: 1;
+}
+.courbe .grille-verticale {
+  stroke: var(--grille);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+}
+.courbe .grille-jour {
+  stroke: var(--grille-jour);
+  stroke-width: 1;
+}
+.courbe .etiquette-y,
+.courbe .etiquette-x {
+  fill: var(--texte-doux);
+  font-size: 11px;
+  font-family: var(--font);
+  font-variant-numeric: tabular-nums;
+}
+.courbe .etiquette-x.jour {
+  fill: var(--texte);
+  font-weight: 600;
+}
+.courbe .ligne {
+  stroke: currentColor;
+}
+.courbe .point {
+  fill: var(--surface);
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+.courbe .curseur {
+  stroke: var(--texte-doux);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+.courbe .point-survole {
+  fill: currentColor;
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+.courbe .lecture {
+  margin-top: 0.45rem;
+  min-height: 1.5rem;
+  font-size: 0.92rem;
+}
+.courbe .lecture strong {
+  color: var(--texte);
+  font-variant-numeric: tabular-nums;
+}
+.courbe .vide {
+  color: var(--texte-doux);
+  font-size: 0.9rem;
+  padding: 1.5rem 0;
+}
+
+/* ── L'analyse sous la courbe ── */
+.analyse {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--bordure);
+  display: grid;
+  gap: 0.5rem;
+}
+.an-tendance {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.94rem;
+}
+.an-tendance strong {
+  color: var(--texte);
+}
+.an-tendance .puce {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 999px;
+  background: currentColor;
+  flex: none;
+}
+/* Une tendance indéterminée ne mérite pas une pastille colorée : elle affirmerait
+   quelque chose que trois mesures ne portent pas. */
+.analyse[data-tendance="indeterminee"] .puce {
+  background: var(--texte-doux);
+  opacity: 0.5;
+}
+.an-chiffres {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(5.5rem, 1fr));
+  gap: 0.5rem 0.75rem;
+  margin: 0;
+}
+.an-chiffres div {
+  display: grid;
+  gap: 0.1rem;
+}
+.an-chiffres dt {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--texte-doux);
+}
+.an-chiffres dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.an-note {
+  font-size: 0.82rem;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Phrase d'explication d'une courbe (héritée de la refonte du 13/08) : ce que la courbe
+   DIT, au-dessus des chiffres qui, eux, suivent le zoom. */
+.courbe .explication {
+  font-size: 0.9rem;
+  color: var(--texte-doux);
+  margin-bottom: 0.5rem;
+}
+.detail-metrique {
+  border: 1px solid var(--bordure);
+  border-radius: 12px;
+  padding: 0.5rem 0.9rem;
+  background: var(--surface);
+}
+.detail-metrique > summary {
+  cursor: pointer;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+/* ── Panneau « le webhook est-il vivant ? » (17/08/2026) ───────────────────────────────
+   Placé au-dessus de la couverture des signaux : un canal mort explique toutes les
+   absences listées en dessous. Le cadre reste discret quand tout va bien — c'est le
+   VERDICT qui porte la couleur, pas la boîte, sinon un écran sain paraît alarmant. */
+.webhook-etat {
+  border: 1px solid var(--bordure);
+  border-radius: 14px;
+  padding: 0.85rem 1rem 0.9rem;
+  background: var(--surface);
+  margin: 0.4rem 0 1.2rem;
+}
+.webhook-etat > h2 {
+  margin: 0 0 0.35rem;
+}
+.webhook-etat .verdict {
+  font-size: clamp(1rem, 0.9rem + 0.6vw, 1.15rem);
+  margin: 0 0 0.35rem;
+}
+.webhook-explication {
+  margin: 0 0 0.6rem;
+  color: var(--texte-doux);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+.webhook-action {
+  margin: 0 0 0.7rem;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  padding: 0.5rem 0.7rem;
+  border-radius: 10px;
+  border-left: 3px solid var(--alerte-bordure);
+  background: color-mix(in srgb, var(--alerte-bordure) 9%, transparent);
+}
+.webhook-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.8rem;
+  margin-bottom: 0.7rem;
+}
+.webhook-form button {
+  font: inherit;
+  font-weight: 600;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--bordure);
+  background: var(--texte);
+  color: var(--surface);
+  cursor: pointer;
+}
+.webhook-form button:hover {
+  opacity: 0.88;
+}
+.webhook-form .meta {
+  flex: 1 1 16rem;
+  color: var(--texte-doux);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+.webhook-faits {
+  margin-bottom: 0.6rem;
+}
+.webhook-faits code {
+  word-break: break-all;
+}
+.webhook-note {
+  margin: 0;
+  color: var(--texte-doux);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+/* Cadence du poll (app/donnees) : la gravité se voit AVANT d'être lue. Une couverture de
+   65 % et une de 100 % ne doivent pas se ressembler au coup d'œil — sinon la mesure existe
+   sans rien changer, ce qui était déjà le cas quand personne ne mesurait. */
+.chiffres[data-gravite="degradee"] .nombre {
+  color: var(--serie-3);
+}
+.chiffres[data-gravite="rompue"] .nombre {
+  color: var(--serie-4);
+}
+
+/* ══ REFONTE CONSTRUCTEUR (17/08/2026) — pastilles, ⓘ, héros voiture, pilotage ════════
+   Dix réponses de cadrage de Marc : sobre type constructeur, sombre assumé, la voiture au
+   centre, actions sur le schéma, badges + ⓘ à la place des paragraphes. */
+
+/* ── Insignes : l'état en deux mots (`.pastille` reste aux puces de légende) ─────────────────────────────────────────────────── */
+.insignes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.5rem 0 0.9rem;
+}
+.insigne {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  padding: 0.24rem 0.62rem;
+  border-radius: 999px;
+  border: 1px solid var(--bordure);
+  background: var(--surface-douce);
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--texte-doux);
+  white-space: nowrap;
+}
+.insigne svg {
+  flex: none;
+}
+/* Le badge « dernière mise à jour » (accueil) est le seul insigne à phrase longue :
+   `nowrap` le TRONQUAIT sur téléphone (capture du 17/08) — lui seul a le droit de
+   replier. Ne pas élargir aux autres insignes, dont le nowrap fait la forme. */
+.maj .insigne {
+  white-space: normal;
+}
+.insigne-ok {
+  color: var(--succes-texte);
+  border-color: color-mix(in srgb, var(--succes-texte) 35%, transparent);
+  background: color-mix(in srgb, var(--succes-texte) 8%, transparent);
+}
+.insigne-attention {
+  color: var(--alerte-texte);
+  border-color: color-mix(in srgb, var(--alerte-texte) 40%, transparent);
+  background: color-mix(in srgb, var(--alerte-texte) 9%, transparent);
+}
+.insigne-danger {
+  color: var(--erreur-texte);
+  border-color: color-mix(in srgb, var(--erreur-texte) 40%, transparent);
+  background: color-mix(in srgb, var(--erreur-texte) 10%, transparent);
+}
+.insigne-estime {
+  color: var(--texte-doux);
+  border-style: dashed;
+}
+a.insigne-lien {
+  text-decoration: none;
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+a.insigne-lien:hover {
+  background: var(--accent-voile);
+}
+
+/* ── ⓘ au tap : l'explication complète, repliée ──────────────────────────────────────── */
+.itap {
+  display: inline-block;
+  position: relative;
+}
+.itap > summary {
+  list-style: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--texte-faible);
+  font-size: 0.8rem;
+  padding: 0.24rem 0.3rem;
+  border-radius: 999px;
+}
+.itap > summary::-webkit-details-marker {
+  display: none;
+}
+/* ⚠️ Taille ÉPINGLÉE : le ⓘ voyage dans tous les contextes (graphiques, tuiles, cartes),
+   et une règle large (`.graphique svg` à 100 % de largeur) l'a déjà gonflé à la taille
+   d'une courbe (capture Marc, 17/08). L'épingle le rend insensible aux règles voisines. */
+.itap > summary svg {
+  width: 0.95rem;
+  height: 0.95rem;
+  border: none;
+  margin: 0;
+}
+.itap > summary:hover {
+  color: var(--texte-doux);
+  background: var(--voile);
+}
+.itap[open] > summary {
+  color: var(--accent);
+}
+.itap-bulle {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  width: min(26rem, 82vw);
+  padding: 0.7rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid var(--bordure-nette);
+  background: var(--surface-douce);
+  box-shadow: var(--ombre-3);
+  font-size: 0.84rem;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--texte-doux);
+  white-space: normal;
+}
+/* Dans une rangée de pastilles, la bulle s'ancre à la rangée, pas au ⓘ (sinon elle
+   déborde de l'écran quand le ⓘ est en bout de ligne). */
+.insignes {
+  position: relative;
+}
+.insignes > .itap {
+  position: static;
+}
+.insignes > .itap > .itap-bulle {
+  left: 0;
+  right: auto;
+}
+
+/* ── Le héros constructeur : la voiture + l'état vital ──────────────────────────────── */
+.heros-constructeur {
+  display: grid;
+  gap: 1.1rem;
+  margin: 0.4rem 0 1rem;
+}
+@media (min-width: 900px) {
+  .heros-constructeur {
+    align-items: start;
+  }
+  /* Les jauges sont le bloc le plus COURT de la rangée (la voiture et la carte sont
+     hautes). Collées en haut, elles laissaient un creux sous elles ; centrées, la rangée
+     se lit comme une bande d'information au lieu de blocs de hauteurs inégales. */
+  .hc-jauges {
+    align-self: center;
+  }
+}
+/* ⚠️ CETTE RÈGLE DOIT RESTER AVANT LES MEDIA QUERIES CI-DESSOUS. Elle était écrite APRÈS,
+   à spécificité égale — donc elle GAGNAIT, et les `display: contents` des deux paliers ne
+   s'appliquaient JAMAIS. Conséquence : le passage en trois colonnes du 18/08 n'a jamais
+   fonctionné, la carte restait empilée sous les jauges, et c'est le vide que Marc a
+   photographié le 19/08. Un media query n'ajoute AUCUNE spécificité : seul l'ordre
+   tranche. Mesuré au banc d'essai (getComputedStyle rendait « grid » là où le fichier
+   annonçait « contents ») — le commentaire de densité affirmait le contraire depuis un
+   jour, sans que rien ne le contredise. */
+.hc-etat {
+  display: grid;
+  gap: 1rem;
+}
+
+/* ── DENSITÉ (Marc, 18/08 : « trop d'espaces vides qui servent à rien ») ─────────────
+   La carte est large (`.carte-large`, 84rem) mais le héros n'avait que DEUX colonnes :
+   la carte de position s'empilait sous les jauges, laissant une colonne à moitié vide et
+   repoussant les tuiles hors de l'écran. `display: contents` promeut les deux enfants de
+   `.hc-etat` en éléments de grille du héros — sans toucher au HTML.
+
+   ⚠️ DEUX PALIERS, et c'est le second qui manquait (capture de Marc, 19/08, écran ~1065 px).
+   Entre 900 et 1200 px on restait à DEUX colonnes : voiture d'un côté, jauges PUIS carte
+   empilées de l'autre. La voiture est courte, la pile est haute — d'où un vide d'un tiers
+   d'écran sous la voiture, exactement ce que la densité devait supprimer. Le palier
+   intermédiaire met la voiture et les jauges CÔTE À CÔTE (toutes deux courtes) et laisse la
+   carte occuper toute la largeur en dessous, là où elle sert vraiment. */
+/* ⚠️ DEUX COLONNES, et c'est un rattrapage. La grille en déclarait TROIS — voiture,
+   jauges, carte — mais `.hc-jauges` a disparu le 20/08 quand charge et autonomie sont
+   passées SUR la carrosserie. Personne n'a rendu sa colonne : la carte occupait la
+   deuxième et la troisième restait VIDE. C'est le grand rectangle vide que Marc a entouré
+   en rouge le 21/08.
+
+   La voiture a une largeur FIXE (`--voiture-largeur`), donc `auto` lui suffit et tout le
+   reste va à la carte. Un test compare désormais le nombre de pistes déclarées au nombre
+   d'enfants réels du héros — c'est ce qui manquait pour l'attraper. */
+@media (min-width: 900px) {
+  .heros-constructeur {
+    grid-template-columns: auto minmax(20rem, 1fr);
+  }
+  .hc-etat {
+    display: contents;
+  }
+}
+/* Au-delà de 1200 px, la carte s'étire sur la rangée — la hauteur, elle, est posée pour
+   TOUTES les largeurs plus bas. Plus de redéclaration de colonnes ici : celle qui s'y
+   trouvait promettait TROIS pistes pour deux enfants, et c'est elle qui creusait le vide. */
+@media (min-width: 900px) {
+  .hc-carte {
+    align-self: stretch;
+  }
+}
+
+/* ══ LES ÉCRANS SECONDAIRES EN COLONNES SUR PC (CarAI#188, REFONTE-UI lot 3) ═════════════
+   Avant : seul l'accueil passait en colonnes ; Activité, Tendances et Données restaient
+   empilés comme sur téléphone, sur 84rem de large.
+
+   `.colonnes-pc` enveloppe un GROUPE de blocs de même rang (deux panneaux, les journées du
+   fil, deux tableaux) et les range côte à côte. Sous 900 px elle n'est qu'un `div` : rien
+   ne bouge sur téléphone. Les grands blocs (carte, courbes, tableau de mesures) restent
+   HORS du groupe, pleine largeur.
+
+   `auto-fit` plutôt qu'un nombre de colonnes fixe : un groupe dont un membre est absent
+   (pas de bail, pas de consommation) rend l'autre pleine largeur au lieu de laisser un
+   trou — la leçon du héros du 21/08, où une piste déclarée sans enfant faisait un
+   rectangle vide. `min(100%, 24rem)` empêche un enfant étroit de déborder, et `min-width: 0`
+   laisse les `.defilement` des tableaux défiler au lieu d'élargir leur colonne.
+
+   Au MÊME endroit que les paliers du héros, pas en fin de fichier : un media query
+   n'ajoute aucune spécificité, seul l'ordre tranche. */
+@media (min-width: 900px) {
+  .colonnes-pc {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
+    gap: 0 1.6rem;
+    align-items: start;
+  }
+  .colonnes-pc > * {
+    min-width: 0;
+  }
+}
+
+.hc-voiture {
+  display: grid;
+  justify-items: center;
+  gap: 0.2rem;
+}
+
+.hc-jauges {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 1.2rem;
+}
+/* La jauge de charge, en GRAND — c'est le chiffre n°1 du cadrage. */
+.hc-charge .jauge {
+  width: clamp(9rem, 24vw, 12rem);
+}
+.hc-charge .jauge-valeur {
+  font-size: clamp(2rem, 5vw, 2.8rem);
+}
+.hc-autonomie {
+  display: grid;
+  gap: 0.15rem;
+  align-content: center;
+}
+.hc-nombre {
+  font-size: clamp(2.4rem, 7vw, 3.6rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.hc-legende {
+  color: var(--texte-doux);
+  font-size: 0.88rem;
+}
+.hc-echelle {
+  color: var(--texte-doux);
+  font-size: 0.72rem;
+  margin-top: 0.2rem;
+}
+/* La barre suit la largeur du bloc plutôt qu'un plafond fixe : à 16rem elle laissait un
+   tiers de la colonne vide à sa droite, ce qui redonnait le vide qu'on venait de chasser.
+   Un plafond généreux évite qu'elle traverse tout l'écran sur un très grand moniteur. */
+.hc-remplissage {
+  margin-top: 0.45rem;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--voile);
+  overflow: hidden;
+  max-width: 32rem;
+}
+.hc-remplissage > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--degrade);
+}
+.hc-carte {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 0.2rem;
+}
+/* ⚠️ À TOUTES LES LARGEURS, et c'est le correctif. La version d'hier ne s'appliquait qu'au
+   palier ≥ 1200 px — mesuré depuis : sur téléphone la carte faisait 230 px contre 603 à la
+   voiture, soit 38 %. Je n'avais mesuré qu'à 1440 px, donc je n'avais vu que le cas déjà
+   réglé. Un correctif de mise en page se vérifie à TOUS les paliers qu'il traverse, pas à
+   celui où on l'a écrit. */
+/* ⚠️ DEUX BRANCHES, et je n'en avais câblé qu'UNE. Avec une clé Google, la carte est un
+   `<iframe class="carte-google">` posé DIRECTEMENT dans `.hc-carte` ; sans clé seulement,
+   elle est enveloppée d'un `.hc-carte-lien`. Mon correctif ne visait que la seconde — donc
+   jamais ce que Marc voit. Les deux chemins sont désormais couverts. */
+.hc-carte-lien {
+  height: var(--voiture-hauteur);
+}
+.hc-carte > .carte-google,
+.hc-carte > .carte-osm,
+.hc-carte-lien > .carte-osm,
+.hc-carte-lien > .carte-google,
+.hc-carte-lien > .carte-cadre {
+  height: var(--voiture-hauteur);
+  max-height: 100%;
+  aspect-ratio: auto;
+}
+.hc-carte-lien > .carte-osm,
+.hc-carte-lien > .carte-google,
+.hc-carte-lien > .carte-cadre {
+  height: 100%;
+}
+.hc-carte-lien {
+  display: block;
+  border-radius: var(--rayon);
+  overflow: hidden;
+  border: 1px solid var(--bordure);
+  line-height: 0;
+}
+.hc-carte-lien:hover {
+  border-color: var(--bordure-nette);
+}
+.hc-carte .carte-osm {
+  margin: 0;
+}
+.hc-sans-position {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--texte-doux);
+  font-size: 0.9rem;
+  padding: 1.2rem;
+  border: 1px dashed var(--bordure);
+  border-radius: var(--rayon);
+  margin: 0;
+}
+
+/* ── Le schéma PILOTABLE : cadenas et prise en boutons ──────────────────────────────── */
+.schema-pilote {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+  /* ⚠️ PAS de `max-width` ici : la taille est posée plus bas, en un seul endroit
+     (chercher « UNE SEULE définition de la taille de la voiture »). En mettre une ici la
+     ferait écraser en silence par celle d'en bas. */
+}
+
+/* ── LES INFORMATIONS POSÉES SUR LA CARROSSERIE ─────────────────────────────────────── */
+.pt-voiture {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+}
+.pt-commande {
+  transform: translate(-50%, -50%);
+}
+.pt-voiture > summary,
+.pt-commande {
+  list-style: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+  padding: 0.16rem 0.42rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--neutre-clair) 22%, transparent);
+  /* ⚠️ ALLÉGÉES POUR LA PHOTO (Marc, 20/08 : « que le texte soit moins agressif, plus
+     fluide avec l'image »). Le réglage d'avant — fond à 88 %, ombre portée franche, bord
+     net — avait été calibré sur un dessin au trait SOMBRE, où il fallait exister. Posé sur
+     une carrosserie blanche, il devient une étiquette collée par-dessus.
+
+     Le fond reste SOMBRE et translucide plutôt que clair : la carrosserie est blanche et
+     le pavillon noir, donc un fond clair disparaîtrait sur l'un des deux. Sombre à 55 %
+     avec un flou plus large tient sur les deux, et laisse voir la tôle au travers. */
+  background: color-mix(in oklch, var(--fond) 55%, transparent);
+  -webkit-backdrop-filter: blur(12px) saturate(1.15);
+  backdrop-filter: blur(12px) saturate(1.15);
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.005em;
+  line-height: 1.1;
+  white-space: nowrap;
+  box-shadow: 0 1px 6px color-mix(in srgb, var(--noir) 28%, transparent);
+  color: var(--texte-clair);
+}
+.pt-voiture > summary::-webkit-details-marker {
+  display: none;
+}
+.pt-voiture > summary:hover,
+.pt-commande:hover {
+  border-color: var(--accent);
+}
+/* Un point qui AGIT se distingue d'un point qui informe : il porte l'accent de l'app.
+   Sans ça, rien ne dirait lequel des dix ouvre une commande. */
+.pt-commande {
+  box-shadow:
+    0 1px 6px color-mix(in srgb, var(--noir) 28%, transparent),
+    0 0 0 1px var(--accent-voile);
+}
+.pt-voiture[open] > summary {
+  border-color: var(--accent);
+}
+.pt-icone {
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.pt-valeur {
+  font-feature-settings: "tnum";
+  font-variant-numeric: tabular-nums;
+}
+.pt-unite {
+  font-size: 0.74em;
+  font-weight: 600;
+  opacity: 0.72;
+  margin-left: 0.22rem;
+}
+/* Les deux valeurs vitales sont plus grosses — on doit les lire sans viser. */
+.pt-vedette > summary,
+.pt-vedette.pt-commande {
+  font-size: 0.92rem;
+  padding: 0.26rem 0.6rem;
+}
+
+.pt-commande.ton-ok,
+.pt-voiture.ton-ok > summary {
+  color: var(--succes-pale);
+  border-color: color-mix(in srgb, var(--succes-texte) 40%, transparent);
+}
+.pt-commande.ton-attention,
+.pt-voiture.ton-attention > summary {
+  color: var(--alerte-pale);
+  border-color: color-mix(in srgb, var(--alerte-texte) 45%, transparent);
+}
+.pt-commande.ton-danger,
+.pt-voiture.ton-danger > summary {
+  color: var(--erreur-texte);
+  border-color: color-mix(in srgb, var(--erreur-texte) 55%, transparent);
+}
+.pt-commande.ton-inconnu,
+.pt-voiture.ton-inconnu > summary {
+  color: var(--inconnu);
+  border-style: dashed;
+}
+
+.pt-bulle {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: calc(100% + 0.4rem);
+  width: min(17rem, 68vw);
+  padding: 0.6rem 0.78rem;
+  border-radius: 12px;
+  border: 1px solid var(--bordure-nette);
+  background: var(--surface-douce);
+  box-shadow: var(--ombre-3);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--texte-doux);
+  display: grid;
+  gap: 0.3rem;
+  z-index: 20;
+}
+.pt-bulle strong {
+  color: var(--texte);
+}
+.pt-bulle p {
+  margin: 0;
+}
+.pt-vers-haut .pt-bulle {
+  top: auto;
+  bottom: calc(100% + 0.4rem);
+}
+.schema-bouton {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  border: 1px solid var(--bordure-nette);
+  background: color-mix(in srgb, var(--surface-douce) 85%, transparent);
+  backdrop-filter: blur(4px);
+  color: var(--texte);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: var(--ombre-2);
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+.schema-bouton:hover {
+  transform: translate(-50%, -50%) scale(1.08);
+  border-color: var(--accent);
+}
+.schema-bouton.alerte {
+  color: var(--erreur-texte);
+  border-color: color-mix(in srgb, var(--erreur-texte) 60%, transparent);
+  animation: pulser-alerte 2.2s ease-in-out infinite;
+}
+@keyframes pulser-alerte {
+  0%, 100% { box-shadow: var(--ombre-2), 0 0 0 0 color-mix(in srgb, var(--erreur-texte) 35%, transparent); }
+  50% { box-shadow: var(--ombre-2), 0 0 0 9px color-mix(in srgb, var(--erreur-texte) 0%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .schema-bouton.alerte {
+    animation: none;
+  }
+}
+
+/* ── La feuille de confirmation ─────────────────────────────────────────────────────── */
+.feuille-fond {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: color-mix(in srgb, var(--noir) 55%, transparent);
+}
+.feuille {
+  position: fixed;
+  z-index: 41;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: min(28rem, 100vw);
+  padding: 1rem 1.1rem calc(1.1rem + env(safe-area-inset-bottom, 0px));
+  border-radius: var(--rayon-l) var(--rayon-l) 0 0;
+  border: 1px solid var(--bordure-nette);
+  border-bottom: none;
+  background: var(--surface-douce);
+  box-shadow: var(--ombre-3);
+  display: grid;
+  gap: 0.8rem;
+}
+@media (min-width: 700px) {
+  .feuille {
+    bottom: auto;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: var(--rayon-l);
+    border-bottom: 1px solid var(--bordure-nette);
+  }
+}
+.feuille-titre {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+.feuille-fermer {
+  margin-left: auto;
+  border: none;
+  background: none;
+  color: var(--texte-faible);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0.3rem 0.5rem;
+  border-radius: 8px;
+}
+.feuille-fermer:hover {
+  background: var(--voile);
+  color: var(--texte);
+}
+.feuille-form {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon);
+  background: var(--surface);
+}
+.feuille-effet {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--texte-doux);
+}
+/* ── Le bouton à APPUI MAINTENU (Marc, 18/08 : « appuyer longtemps pour confirmer ») ──
+   Le remplissage progresse pendant l'appui : c'est le seul retour qui dit « continue de
+   tenir ». Sa durée DOIT rester égale à `DUREE_APPUI_MS` de SchemaInteractif.tsx — un
+   remplissage plus court promettrait un envoi qui n'a pas encore eu lieu. Verrouillé par
+   tests/refonte.test.ts, qui compare les deux valeurs. */
+.feuille-form .maintenir {
+  position: relative;
+  overflow: hidden;
+  font: inherit;
+  font-weight: 700;
+  padding: 0.55rem 1rem;
+  border-radius: 999px;
+  border: 1px solid var(--bordure-nette);
+  background: var(--texte);
+  color: var(--sur-accent);
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.feuille-form .maintenir:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+.feuille-form .maintenir.danger {
+  background: color-mix(in srgb, var(--erreur-texte) 14%, transparent);
+  border-color: color-mix(in srgb, var(--erreur-texte) 50%, transparent);
+  color: var(--erreur-texte);
+}
+.maintenir-libelle {
+  position: relative;
+  z-index: 1;
+}
+.maintenir-remplissage {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: color-mix(in srgb, var(--accent) 45%, transparent);
+  z-index: 0;
+}
+.maintenir.enfonce .maintenir-remplissage {
+  width: 100%;
+  transition: width 800ms linear;
+}
+@media (prefers-reduced-motion: reduce) {
+  .maintenir.enfonce .maintenir-remplissage {
+    transition: none;
+    width: 100%;
+    opacity: 0.5;
+  }
+}
+
+/* Le résultat d'une commande, RENDU SUR PLACE — plus de rechargement de page. */
+.feuille-resultat {
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--rayon);
+  border: 1px solid var(--bordure);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.feuille-resultat.ton-ok {
+  color: var(--succes-texte);
+  border-color: color-mix(in srgb, var(--succes-texte) 35%, transparent);
+  background: color-mix(in srgb, var(--succes-texte) 8%, transparent);
+}
+.feuille-resultat.ton-attention {
+  color: var(--alerte-texte);
+  border-color: color-mix(in srgb, var(--alerte-jaune) 35%, transparent);
+  background: color-mix(in srgb, var(--alerte-jaune) 8%, transparent);
+}
+.feuille-resultat.ton-danger {
+  color: var(--erreur-texte);
+  border-color: color-mix(in srgb, var(--erreur-texte) 40%, transparent);
+  background: color-mix(in srgb, var(--erreur-texte) 10%, transparent);
+}
+.feuille-note {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--texte-faible);
+}
+
+/* ── Le bandeau bail (démoté du héros — choix de Marc au cadrage) ───────────────────── */
+.bandeau-bail {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon-l);
+  background: var(--surface);
+  margin: 0 0 1.1rem;
+}
+.bandeau-bail .verdict-nombre {
+  font-size: clamp(1.7rem, 4.5vw, 2.3rem);
+}
+.bandeau-bail .insignes {
+  margin: 0.3rem 0 0;
+}
+
+/* ── [BAIL-DOLLARS] Les montants du bail, sous les kilomètres (Marc, 15/09) ──────────── */
+
+/* Ce que FinanceAI ne peut pas dire. Pas un tiret : une phrase qui nomme le geste.
+   ⚠️ Deux tons, et la distinction compte — « à configurer » appelle une action de Marc,
+   « FinanceAI est éteint » n'appelle rien du tout et ne doit pas ressembler à une erreur. */
+.bail-dollars-absent {
+  margin: 0.15rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--texte-doux);
+}
+.bail-dollars-absent.a-configurer {
+  color: var(--texte);
+  padding-left: 0.6rem;
+  border-left: 2px solid var(--accent);
+}
+
+/* Les versements, sous la barre : le « combien de fois » que le montant seul ne dit pas. */
+.bail-dollars-detail {
+  margin: 0.1rem 0 0;
+  font-size: 0.8rem;
+  color: var(--texte-doux);
+}
+
+/* Les écarts entre CarAI et FinanceAI. Jamais corrigés en silence : un écart veut dire
+   qu'une des deux saisies est fausse, et Marc est le seul à pouvoir trancher. */
+.bail-dollars-reserves {
+  margin: 0.35rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--alerte-texte);
+}
+.bail-dollars-reserves li + li {
+  margin-top: 0.2rem;
+}
+
+/* ── Indicateurs voiture : icônes SEULES, détail au tap (2ᵉ passe, 17/08) ───────────── */
+.indicateurs {
+  display: flex;
+  justify-content: center;
+  gap: 0.55rem;
+  margin: 0.4rem 0 0.2rem;
+  position: relative;
+}
+.indicateur {
+  position: static;
+}
+.indicateur > summary {
+  list-style: none;
+  cursor: pointer;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  border: 1px solid var(--bordure);
+  background: var(--surface-douce);
+  display: grid;
+  place-items: center;
+}
+.indicateur > summary::-webkit-details-marker {
+  display: none;
+}
+.indicateur > summary:hover {
+  border-color: var(--bordure-nette);
+}
+.ind-ok > summary {
+  color: var(--succes-texte);
+  border-color: color-mix(in srgb, var(--succes-texte) 40%, transparent);
+}
+.ind-attention > summary {
+  color: var(--alerte-texte);
+  border-color: color-mix(in srgb, var(--alerte-texte) 45%, transparent);
+}
+.ind-danger > summary {
+  color: var(--erreur-texte);
+  border-color: color-mix(in srgb, var(--erreur-texte) 50%, transparent);
+  background: color-mix(in srgb, var(--erreur-texte) 10%, transparent);
+}
+.ind-inconnu > summary {
+  color: var(--inconnu);
+  border-style: dashed;
+}
+.indicateur[open] > summary {
+  border-color: var(--accent);
+}
+.ind-bulle {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 0.45rem);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(22rem, 86vw);
+  padding: 0.7rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid var(--bordure-nette);
+  background: var(--surface-douce);
+  box-shadow: var(--ombre-3);
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: var(--texte-doux);
+  display: grid;
+  gap: 0.3rem;
+}
+.ind-bulle strong {
+  color: var(--texte);
+}
+.ind-bulle p {
+  margin: 0;
+}
+
+/* ── Bandeau charge en cours ────────────────────────────────────────────────────────── */
+/* Le bandeau CHARGE est désormais TOUJOURS là (Marc, 20/08 : « je veux voir si le véhicule
+   est en charge ou non »). Sa couleur porte donc une information : vert = ça charge,
+   ambre = branchée mais en attente, neutre = au repos, pointillé = inconnu. Le défaut
+   (sans classe de ton) reste le vert d'avant, pour qu'un appelant oublié ne soit pas nu. */
+.bandeau-charge {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 0.6rem 0.9rem;
+  border-radius: var(--rayon);
+  border: 1px solid color-mix(in srgb, var(--succes-texte) 40%, transparent);
+  background: color-mix(in srgb, var(--succes-texte) 8%, transparent);
+  margin: 0.3rem 0 0.9rem;
+}
+.bandeau-charge.ton-attente {
+  border-color: color-mix(in srgb, var(--alerte-texte) 45%, transparent);
+  background: color-mix(in srgb, var(--alerte-texte) 9%, transparent);
+}
+.bandeau-charge.ton-repos,
+.bandeau-charge.ton-inconnu {
+  border-color: var(--bordure);
+  background: var(--voile);
+}
+.bandeau-charge.ton-inconnu {
+  border-style: dashed;
+}
+/* Le bandeau devient une VIGNETTE : l'illustration d'abord, le texte à côté (Marc, 20/08 :
+   « je veux genre une image ou un logo électrique, un le plug qu'on branche, que ce soit
+   visuel »). L'icône de 20 px accompagnait un libellé ; ici l'image est le sujet. */
+.bandeau-charge {
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.8rem 1rem;
+}
+.bc-illu {
+  flex: none;
+  display: grid;
+  place-items: center;
+  color: var(--succes-texte);
+}
+.ton-attente .bc-illu { color: var(--alerte-texte); }
+.ton-repos .bc-illu,
+.ton-inconnu .bc-illu { color: var(--texte-faible); }
+.bc-corps {
+  flex: 1 1 14rem;
+  min-width: 0;
+  display: grid;
+  gap: 0.15rem;
+}
+.bc-titre {
+  margin: 0;
+  font-weight: 800;
+  font-size: clamp(1.05rem, 0.95rem + 0.5vw, 1.3rem);
+  letter-spacing: -0.015em;
+  color: var(--texte);
+}
+.bc-fin {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--texte-doux);
+}
+.bc-fin strong {
+  color: var(--texte);
+  font-variant-numeric: tabular-nums;
+}
+/* L'éclair ne pulse que pendant une VRAIE charge — sur une voiture au repos, une animation
+   fabriquerait de l'activité là où il n'y en a pas. */
+.illu-eclair-actif {
+  animation: pulser-charge 2.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .illu-eclair-actif { animation: none; }
+}
+.bandeau-charge .bc-quand {
+  color: var(--texte-faible);
+  font-size: 0.85rem;
+}
+.bc-icone {
+  color: var(--succes-texte);
+  display: grid;
+  place-items: center;
+  animation: pulser-charge 2.4s ease-in-out infinite;
+}
+/* ⚠️ La pulsation dit « il se passe quelque chose EN CE MOMENT ». Elle n'a rien à faire
+   sur une voiture au repos : elle transformerait l'absence de charge en fausse activité. */
+.ton-attente .bc-icone {
+  color: var(--alerte-texte);
+  animation: none;
+}
+.ton-repos .bc-icone,
+.ton-inconnu .bc-icone {
+  color: var(--texte-faible);
+  animation: none;
+}
+@keyframes pulser-charge {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bc-icone { animation: none; }
+}
+.bc-texte {
+  font-size: 0.92rem;
+  color: var(--texte-doux);
+}
+.bc-texte strong {
+  color: var(--texte);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Carte Google (Embed API) ───────────────────────────────────────────────────────── */
+.carte-google {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon);
+  /* L'iframe Google est clair : le fondre dans le thème sombre sans MENTIR sur les
+     couleurs de la carte — on adoucit, on n'inverse jamais. */
+  filter: brightness(0.92) saturate(0.95);
+  background: var(--surface-douce);
+}
+/* La zone parcourue est une IMAGE (Maps Static), pas un iframe : sans object-fit, le
+   cadre 16/9 l'étirerait si Google servait un autre ratio. `height: auto` de l'agent
+   utilisateur est neutralisé par l'aspect-ratio du cadre ci-dessus. */
+img.carte-google {
+  object-fit: cover;
+}
+
+/* ⚠️ ICI VIVAIT UNE SECONDE PASSE DE DENSITÉ, et elle cassait la première.
+   Elle redéclarait `.heros-constructeur { grid-template-columns: … 2.2fr }` sous
+   `@media (min-width: 900px)`, MILLE LIGNES plus bas que les paliers du héros. Un media
+   query n'ajoute aucune spécificité : étant la dernière, elle GAGNAIT à toutes les
+   largeurs ≥ 900 px et écrasait le passage à trois colonnes. Résultat : la mise en page
+   « dense » du 18/08 n'a jamais eu lieu, la carte restait empilée sous les jauges, et
+   c'est le vide que Marc a photographié le 19/08 — mesuré au banc d'essai
+   (`gridTemplateColumns` rendait deux pistes là où le fichier en déclarait trois).
+   Les paliers sont désormais au MÊME endroit, dans l'ordre croissant. Toute nouvelle
+   passe de densité se fait LÀ-BAS, jamais en ajoutant un bloc à la fin. */
+/* ⚠️ UNE SEULE définition de la taille de la voiture, et c'est ICI — cette règle vient
+   APRÈS celle de `.schema-pilote` plus haut dans le fichier, donc à spécificité égale
+   c'est elle qui gagne. Le piège de cascade a déjà coûté deux fois sur ce fichier.
+
+   La taille se pose sur le CONTENEUR, jamais sur le SVG : les pastilles se positionnent
+   en pourcentage du conteneur, donc un SVG plus étroit que son parent (ce que produisait
+   `max-height: 20rem`) décalait chaque pastille par rapport à la carrosserie qu'elle
+   désigne. Mesuré au banc : cadre 171 px pour des pastilles de 77 px — illisible.
+   La largeur choisie donne ~272 × 508 px, où une pastille pèse ~22 % de la largeur. */
+.schema-pilote {
+  max-width: var(--voiture-largeur);
+}
+
+/* ══ LE REGROUPEMENT DE L'ACCUEIL — TÉLÉPHONE SEULEMENT ════════════════════════════════
+   Marc, 13/09 : « encore un peu trop terne, trop plat, trop d'info de partout, pas assez
+   regroupé ». Mesuré sur l'accueil à 390 px avant ce lot :
+     · DOUZE blocs de premier niveau empilés à plat, aucun regroupement, page de 3 151 px ;
+     · AUCUNE surface teintée — les huit fonds employés ont une chroma ≤ 0,03, c'est-à-dire
+       du gris-bleu ; la couleur ne vivait que dans le TEXTE (l'état vert, l'alerte ambre) ;
+     · UNE SEULE élévation réellement portée (`--ombre-1`), alors que le fichier déclare
+       trois marches et écrit lui-même « une ombre unique partout, c'est encore du plat » ;
+     · VINGT combinaisons taille/graisse de texte, dont sept entre 12 et 13,6 px — autant
+       de niveaux qui se ressemblent ne font aucune hiérarchie.
+
+   ⚠️ LE DESKTOP NE BOUGE PAS, et c'est ce bloc-ci qui le garantit : `display: contents`
+   fait disparaître la BOÎTE du groupe sans toucher à ses enfants, qui coulent donc
+   exactement comme avant dans `.carte`. Les titres de groupe sont masqués. Au-dessus de
+   700 px, le rendu est identique boîte pour boîte à celui d'avant le lot. */
+.grp {
+  display: contents;
+}
+/* ⚠️ `.grp > .grp-titre` ET PAS `.grp-titre` : `.carte h2` (0,1,1) pose déjà
+   `display: flex` et `margin: 2rem 0 0.75rem`, et bat une classe seule (0,1,0). Écrite
+   simplement, la règle ci-dessous ne masquait RIEN sur grand écran — mesuré : les quatre
+   titres s'affichaient, et sur téléphone ils emportaient en plus 2rem de marge haute
+   chacun. Le sélecteur d'enfant direct monte à (0,2,0) et passe devant. C'est le piège de
+   cascade que ce fichier a déjà payé deux fois ; il vient de se représenter. */
+.grp > .grp-titre {
+  display: none;
+}
+/* ══ L'ESSENTIEL — les trois chiffres du coup d'œil, SUR LES DEUX ÉCRANS ═════════════
+
+   ⚠️ IL ÉTAIT `display: none` HORS TÉLÉPHONE jusqu'au 18/09/2026, au motif que « sur grand
+   écran, la décision du 20/08 (tout sur la voiture) reste entière ». Ça tenait tant que le
+   PC était un usage marginal — Marc a répondu « moitié-moitié » à la question posée le
+   18/09, et « un premier écran très court, le détail en dessous » pour LES DEUX. Un
+   bandeau qui n'existe que sur la moitié des visites n'est pas un premier écran.
+
+   ⚠️ CE QUI RESTE VRAI DE LA DÉCISION DU 20/08 : la charge et l'autonomie sont AUSSI sur
+   la carrosserie, en pastilles posées à leur endroit. Ce n'est pas une duplication mais
+   une hiérarchie — le chiffre qui décide en grand, l'état de la pièce sur la pièce. Si le
+   lot de la voiture en 3D change cet équilibre, c'est LÀ que l'arbitrage se reprendra.  */
+.essentiel {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.7rem;
+  margin: 0 0 1.1rem;
+}
+
+/* ⚠️ LE POULS NE BAT QUE QUAND LA VOITURE CHARGE, et il ne remplace aucun mot : le
+   libellé dit déjà « En charge ». Il est là parce que Marc a demandé PLUS d'animation
+   (18/09) et que la seule animation qui se justifie sur un tableau de bord est celle qui
+   porte une information — une décoration qui bouge attire l'œil vers rien.
+   `prefers-reduced-motion` l'immobilise sans le faire disparaître : l'état reste lisible
+   pour qui refuse le mouvement. */
+.ess-pouls {
+  display: inline-block;
+  width: 0.42rem;
+  height: 0.42rem;
+  margin-right: 0.35rem;
+  border-radius: 50%;
+  background: var(--succes-texte);
+  vertical-align: 0.05em;
+  animation: ess-pouls 1.8s ease-in-out infinite;
+}
+@keyframes ess-pouls {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--succes-texte) 55%, transparent);
+  }
+  50% {
+    opacity: 0.55;
+    box-shadow: 0 0 0 0.28rem color-mix(in srgb, var(--succes-texte) 0%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ess-pouls {
+    animation: none;
+  }
+}
+
+/* ⚠️ SUR TÉLÉPHONE, LES PASTILLES ÉTAIENT DES CIBLES DE 20 PX (Marc, 13/09 : « fais les
+   boutons et tout plus gros »). Mesuré au banc Chromium à 390 × 844, sur le VRAI
+   `globals.css` et le balisage exact de `SchemaInteractif` : les DIX cibles de l'accueil
+   passaient sous 44 px — la plus grosse (charge) 26,5 px, les huit autres 20,1 px. Le
+   minimum tenable au doigt est 44 px : on visait donc à moins de la moitié.
+
+   ⚠️ AGRANDIR LES PASTILLES SEULES NE SUFFIT PAS — et c'est le résultat qui a décidé de
+   ce bloc. À 17rem (la largeur du desktop), des pastilles de 44 px font se TOUCHER
+   l'autonomie et la charge (mesuré : recouvrement de 32 × 1 px). La carrosserie est la
+   ressource rare : il faut l'élargir en même temps, sinon on échange un défaut contre un
+   autre. 20rem est le réglage mesuré qui tient : cadre 320 × 709 px, donc la voiture
+   ENTIÈRE reste visible sous la barre de nav d'un écran de 844 px — à 21rem elle fait
+   745 px et sort de l'écran.
+
+   Mesuré au PIRE CAS de contenu, pas à l'affichage du moment (la charge affichant son
+   heure de fin « 100 % · 15 h 35 », le verrou affichant « Verrouillée ») :
+     • plus petite cible 44,2 px — les dix passent ;
+     • zéro chevauchement, zéro débordement du cadre ;
+     • marge verticale la plus faible : 4 px, entre autonomie et charge. Positive mais
+       serrée — c'est `tests/pointsVoiture.test.ts` qui la surveille désormais, parce
+       qu'un contenu plus long la rendrait négative sans que rien ne le dise.
+
+   Le desktop ne bouge pas : tout est sous ce media query, les ancres ne changent pas. */
+@media (max-width: 700px) {
+  :root {
+    --voiture-largeur: 20rem;
+  }
+  .pt-voiture > summary,
+  .pt-commande {
+    font-size: 0.8rem;
+    padding: 0.88rem 0.6rem;
+    gap: 0.3rem;
+  }
+  .pt-vedette > summary,
+  .pt-vedette.pt-commande {
+    font-size: 0.95rem;
+    padding: 0.88rem 0.75rem;
+  }
+
+  /* ⚠️ LA BULLE D'EXPLICATION SORTAIT DE L'ÉCRAN, et le défaut est ANTÉRIEUR au
+     téléphone : centrée sur son point et large de 68vw, elle perdait déjà 36 px à
+     gauche quand la voiture faisait 17rem, et 53 px une fois élargie à 20rem par le
+     lot précédent — donc oui, je l'ai aggravé avant de le voir. Quatre bulles sur
+     huit, toutes les pressions, c'est-à-dire les points les plus excentrés.
+     Le côté vient de `cotePastille()` (dérivé de l'ancre, jamais d'une liste) ;
+     ici on ne fait que l'appliquer. Mobile seulement : sur grand écran le cadre a
+     de la place autour de lui, et le desktop ne bouge pas. */
+  .pt-bord-gauche .pt-bulle {
+    left: 0;
+    transform: none;
+  }
+  .pt-bord-droite .pt-bulle {
+    left: auto;
+    right: 0;
+    transform: none;
+  }
+
+  /* ⚠️ CE QUI SE TAPE FAIT 44 px, le reste NON. Mesuré au banc : cinq cibles en
+     dessous sur l'accueil — le ⓘ (24,8 × 22,8), les deux liens-insignes de la carte
+     (26,3 de haut) et les deux liens du pied (15 px de haut).
+     On ne gonfle QUE ce qui se tape : grossir `.insigne` en bloc aurait aussi
+     épaissi les pastilles de simple LECTURE, qui ne se tapent pas — on aurait payé
+     en encombrement (« trop d'infos d'un coup ») un confort que personne n'utilise. */
+  .itap > summary {
+    min-height: 44px;
+    min-width: 44px;
+    justify-content: center;
+  }
+  a.insigne-lien {
+    min-height: 44px;
+    padding-block: 0.5rem;
+  }
+  .pied a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding-inline: 0.15rem;
+  }
+
+  /* LE SÉLECTEUR DE FENÊTRE — il arrive sur Activité le 14/09 (« filtrer par date mois
+     etc »), et il vit sur Tendances depuis le 13/08. Mesuré au banc avant de toucher
+     quoi que ce soit : 9 de ses 13 cibles étaient sous 44 px — les cinq raccourcis à
+     31,8, les deux champs de date à 35,5, « Afficher » à 34,1 et « Effacer » à 22,5.
+     C'était déjà vrai sur Tendances : le partage ne crée pas ce défaut, il le rend
+     visible, et une règle commune le corrige des deux côtés d'un coup.
+     ⚠️ `min-height` seul ne fait RIEN sur un `<a>` : il reste `inline`, donc sans
+     hauteur propre. D'où `inline-flex` sur les deux liens.
+     ⚠️ `min-width` autant que `min-height` : « 7j » ne fait que trois caractères, et une
+     cible de 44 px de haut sur 20 de large n'est pas une cible de 44 px.
+     Le padding est à 0.7rem parce que c'est la valeur mesurée qui garde les cinq
+     raccourcis sur UNE ligne à 360 px (0.85rem les faisait passer à deux, et le bloc
+     gagnait 50 px de haut). Prix assumé du confort : le sélecteur passe de 204 à 255 px. */
+  .raccourcis a,
+  .raccourcis span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    min-width: 44px;
+    padding-inline: 0.7rem;
+  }
+  .filtres input[type="date"],
+  .filtres button {
+    min-height: 44px;
+  }
+  .filtres a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+  /* ⚠️ LE TROU DE CETTE FAMILLE, ET IL NE SE VOYAIT QUE SUR /donnees. Les trois règles
+     ci-dessus couvrent les champs de date, les boutons et les liens — écrites pour le
+     sélecteur de fenêtre, qui n'a pas de menu déroulant. Le formulaire de filtres de
+     Données, lui, n'est QUE des menus déroulants : mesurés au banc Chromium à 360 et
+     390 px, les trois tombaient à **29,6 px de haut** et **14,1 px de police**, pendant
+     que le bouton « Filtrer » et les deux liens d'export à côté d'eux faisaient déjà
+     leurs 44 px. Une famille de règles qui énumère les types de contrôle en oublie un,
+     et l'oubli ne se voit que sur l'écran qui l'emploie.
+     Les 16 px ne sont pas un choix esthétique : sous ce seuil, iOS ZOOME la page à la
+     mise au point du champ. */
+  .filtres select {
+    min-height: 44px;
+    font-size: 1rem;
+  }
+
+  /* La navigation d'un tableau de 125 pages faisait **16 px de haut** : les deux liens
+     vivent dans le paragraphe qui explique la pagination, donc ils héritaient de la
+     ligne de texte. Ce sont pourtant des ACTIONS, pas de la prose — WCAG 2.2 SC 2.5.8
+     n'exempte une cible que lorsqu'elle est dans une PHRASE, et « Suivante → » n'en est
+     pas une.
+
+     ⚠️ Le sélecteur est la RELATION, pas une classe. `rel="prev"` / `rel="next"` sont
+     les types de lien standard de la pagination : l'attribut a sa valeur propre (les
+     navigateurs et les outils d'assistance le lisent), il désigne ces deux liens sans
+     ambiguïté dans toute l'app, et il évite d'inventer une énième classe jumelle de
+     celles qui rendent déjà un lien tapable ailleurs. Une règle tenue à deux endroits
+     est une règle et demie. */
+  a[rel="prev"],
+  a[rel="next"] {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding-inline: 0.3rem;
+  }
+
+  /* ══ RÉGLAGES — « les formulaires sont pénibles » (Marc, 13/09) ══════════════════════
+     Mesuré au banc avant de toucher quoi que ce soit, à 360 et 390 px : 12 des 14 cibles
+     de cet écran étaient sous 44 px. Les champs du contrat à 42 px (deux de trop),
+     « Enregistrer » à 43,6 (quatre DIXIÈMES de trop), les champs d'ajout de lieu à 21 px,
+     le sélecteur à 29,6, les « Retirer » à 25,6.
+     ⚠️⚠️ Et surtout : TROIS champs sous 16 px (13,3 et 14,1). Sous ce seuil, iOS ZOOME
+     tout seul à la mise au point — on tape un tarif, la page saute, on la recadre à la
+     main, et c'est exactement ce que « pénible » veut dire. C'est le point le plus
+     concret de cet écran, et il ne se voit sur aucune capture : il faut y taper.
+     Le formulaire d'ajout de lieu passe aussi en colonne : trois champs côte à côte à
+     360 px, ce sont trois champs trop étroits pour ce qu'on y écrit. */
+  .reglages input,
+  .reglages button,
+  .form-lieu input,
+  .form-lieu select,
+  .form-lieu button {
+    min-height: 44px;
+    font-size: 1rem;
+  }
+  .form-lieu .filtres label {
+    display: grid;
+    gap: 0.2rem;
+    width: 100%;
+  }
+  .form-lieu .filtres input,
+  .form-lieu .filtres select {
+    width: 100%;
+    max-width: none;
+  }
+  .lien-bouton {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding-inline: 0.2rem;
+  }
+  /* Le résumé d'une section repliée est une cible : c'est lui qu'on tape pour l'ouvrir. */
+  .replie > summary {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  /* ⚠️ LES TROIS PASTILLES DE SANTÉ, TROUVÉES APRÈS COUP — 40 x 40 px, mesurées le 14/09
+     sur le CSS SERVI EN PRODUCTION. Elles sont rondes par `width/height: 2.5rem`, donc
+     `min-height` ne les touche pas : il faut reprendre les DEUX dimensions.
+
+     ⚠️ POURQUOI LE LOT DU 14/09 NE LES A PAS VUES, et c'est la leçon : son banc recopiait
+     le balisage à la main et comptait QUATORZE cibles. Le banc refait depuis le vrai
+     balisage en compte VINGT-CINQ — les onglets, la liste des lieux et ces trois
+     indicateurs n'y étaient tout simplement pas. Un banc recopié ne couvre que ce que son
+     auteur y a mis, et « 0 cible sous 44 px » ne vaut que pour les cibles qu'il porte.
+
+     `<Indicateur>` n'est employé que par l'écran Réglages (vérifié par grep) : la règle
+     n'a donc aucun autre écran à déplacer. */
+  .indicateur > summary {
+    width: 44px;
+    height: 44px;
+  }
+
+  /* Les libellés de tuile étaient à 10,88 px, en capitales espacées — la taille où
+     l'œil devine au lieu de lire. Ils nomment le chiffre juste au-dessus : illisibles,
+     ils laissent un nombre sans unité ni sujet. */
+  .tuile-libelle {
+    font-size: 0.78rem;
+    letter-spacing: 0.06em;
+    /* Mesuré sur la surface de la tuile : `--texte-faible` y vaut 3,93 de contraste, sous
+       le seuil AA de 4,5. Défaut PRÉEXISTANT (le fond de la tuile n'a pas bougé de ce
+       lot), mais c'est exactement le « terne » dont parle Marc, et la règle était déjà
+       sous la main. */
+    color: var(--texte-doux);
+  }
+
+  /* ── LE GROUPEMENT : quatre sujets nommés au lieu de douze blocs à plat ──────────── */
+  .grp {
+    display: block;
+    margin: 0 0 0.85rem;
+    padding: 0.7rem 0.7rem 0.75rem;
+    border-radius: var(--rayon);
+    border: 1px solid var(--bordure);
+    /* Une marche AU-DESSUS du fond de la carte (19,5 %) et EN DESSOUS des tuiles (23 %) :
+       le groupe porte, les éléments qu'il contient sont posés dessus. Sans cette marche
+       intermédiaire, tout se retrouve au même niveau — c'est ça, « plat ». */
+    background: var(--groupe);
+    box-shadow: var(--ombre-1);
+  }
+  /* La carrosserie est la ressource rare (mesuré au lot précédent) : son groupe lui rend
+     sa largeur au lieu de la manger en marge intérieure. */
+  .grp-voiture {
+    padding-inline: 0.45rem;
+  }
+  /* ⚠️ LA TEINTE EST CE QUI ENLÈVE LE « TERNE », et elle reste un CHUCHOTEMENT.
+     Mesuré avant ce lot : les huit fonds de l'accueil avaient tous une chroma ≤ 0,03,
+     autrement dit du gris-bleu — la couleur ne vivait que dans le texte. Ici la chroma
+     monte à 0,05 à luminosité inchangée (21,5 %), donc on lit « ce bloc est chaud / vert /
+     bleu » sans qu'aucun texte ne perde en lisibilité : la clarté du fond ne bouge pas
+     d'un point, et c'est elle qui porte le contraste.
+     La teinte suit le SUJET via les jetons d'état, jamais l'accent — même raison que pour
+     le marqueur du titre. */
+  .grp-voiture {
+    background: var(--groupe-voiture);
+  }
+  .grp-alertes {
+    background: var(--groupe-alertes);
+  }
+  .grp-mois {
+    background: var(--groupe-mois);
+  }
+  .grp-bail {
+    background: var(--groupe-bail);
+  }
+  .grp > .grp-titre {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0 0 0.55rem;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    /* ⚠️ `--texte-doux` et non `--texte-faible` : mesuré sur les fonds teintés, le gris
+       faible tombe à 4,0-4,1 de contraste, sous le seuil AA de 4,5 — et un titre de
+       groupe n'est pas du « texte large » au sens WCAG (13 px gras, il faut 18,7).
+       C'est la teinte qui a mangé la marge en montant la clarté du fond de 19,5 à 21,5 % :
+       la couleur ne doit pas se payer en lisibilité. */
+    color: var(--texte-doux);
+    border: none;
+    padding: 0;
+  }
+  /* ⚠️ ON NE CRÉE PAS DE MARQUEUR : `.carte h2::before` en dessine DÉJÀ un, une barre de
+     3 px en dégradé, depuis toujours. On ne fait que la RECOLORER au ton du sujet — un
+     second marqueur à côté du premier aurait été le vrai « trop d'info ».
+     Le ton vient des jetons d'ÉTAT, jamais de l'accent : le fichier pose en tête que les
+     deux ne se mélangent pas, parce qu'une couleur qui veut dire deux choses ne veut plus
+     rien dire. La voiture garde donc le dégradé d'origine, elle. */
+  .grp-alertes > .grp-titre::before {
+    background: var(--alerte-texte);
+  }
+  .grp-mois > .grp-titre::before {
+    background: var(--succes-texte);
+  }
+  .grp-bail > .grp-titre::before {
+    background: var(--serie-3);
+  }
+  /* Le groupe porte déjà sa marge : celle du dernier enfant ferait un fond de boîte vide. */
+  .grp > :last-child {
+    margin-bottom: 0;
+  }
+
+  /* ── L'ESSENTIEL : trois chiffres avant les 1 557 px du héros ────────────────────── */
+  .essentiel {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+    margin: 0 0 0.85rem;
+  }
+  .ess-item {
+    display: grid;
+    gap: 0.1rem;
+    padding: 0.7rem 0.5rem;
+    border-radius: var(--rayon);
+    border: 1px solid var(--bordure);
+    background: var(--surface-douce);
+    box-shadow: var(--ombre-1);
+    text-align: center;
+    min-width: 0;
+  }
+  .ess-valeur {
+    font-size: 1.55rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+    color: var(--texte);
+  }
+  .ess-unite {
+    font-size: 0.62em;
+    font-weight: 650;
+    margin-left: 0.12em;
+    color: var(--texte-faible);
+  }
+  .ess-libelle {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--texte-faible);
+  }
+  /* La couleur suit la VALEUR (charge basse = ambre, critique = rouge), donc elle informe.
+     Le ton neutre ne teinte rien : un chiffre sans seuil n'a pas d'état à montrer. */
+  .ess-item.ton-ok .ess-valeur {
+    color: var(--succes-texte);
+  }
+  .ess-item.ton-attention .ess-valeur {
+    color: var(--alerte-texte);
+  }
+  .ess-item.ton-danger .ess-valeur {
+    color: var(--erreur-texte);
+  }
+  .ess-item.ton-danger {
+    border-color: color-mix(in srgb, var(--erreur-texte) 45%, transparent);
+  }
+
+  /* ── LES TUILES : une vedette, quatre suivantes ──────────────────────────────────── */
+  /* ⚠️ DEUX COLONNES IMPOSÉES. La grille de base est `auto-fit, minmax(8.5rem, 1fr)` :
+     une fois les tuiles rentrées dans un groupe, la largeur disponible est passée sous
+     2 × 8,5rem et `auto-fit` a replié les quatre petites EN COLONNE — la page est montée
+     de 3 151 à 3 640 px, soit l'inverse exact de ce qu'on cherche. Le groupement ne doit
+     jamais coûter une colonne : on la fixe. */
+  .tuiles {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.55rem;
+  }
+  .tuile-vedette {
+    grid-column: 1 / -1;
+  }
+  .tuile-vedette .tuile-valeur {
+    font-size: 2rem;
+  }
+  /* Les tuiles sont POSÉES sur le groupe : un cran plus clair, et leur propre ombre. */
+  .tuile {
+    box-shadow: var(--ombre-1);
+  }
+}
+
+/* ══ ÉTAPE 2 (17/08) — nav 4 écrans, fil mêlé, panneau trajet, curseur ═══════════════ */
+
+/* Les onglets portent désormais icône + libellé. Sur téléphone, la barre passe EN BAS,
+   fixe, au pouce (choix de Marc). Sur grand écran elle reste en haut, dans la carte. */
+.onglets a,
+.onglets span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+@media (max-width: 700px) {
+  .onglets {
+    position: fixed;
+    z-index: 35;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    margin: 0;
+    padding: 0.45rem 0.6rem calc(0.45rem + env(safe-area-inset-bottom, 0px));
+    background: color-mix(in srgb, var(--fond-2) 92%, transparent);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid var(--bordure);
+    justify-content: space-around;
+    flex-wrap: nowrap;
+  }
+  /* ⚠️ 0,78rem et non 0,68 : le libellé de la barre du bas était à 10,88 px. La règle
+     vit ICI et pas dans le bloc mobile du héros, mille lignes plus haut — un media
+     query n'ajoute aucune spécificité, donc c'est ce bloc-ci, écrit APRÈS, qui gagne.
+     Le piège de cascade a déjà coûté deux fois sur ce fichier.
+
+     ⚠️ ET LE PADDING DESCEND À 0,25rem EN MÊME TEMPS. Mon premier jet gardait 0,5rem
+     et affirmait en commentaire « les quatre onglets tiennent à 390 px » — écrit AVANT
+     de mesurer, et FAUX : « Réglages » sortait de 5 px. Balayé ensuite à deux largeurs,
+     bord droit du dernier onglet :
+       0,68rem / 0,5rem  (l'existant) → 364 px à 360, 378 à 390  ⇒ DÉBORDE à 360 px,
+                                        donc l'onglet Réglages était déjà coupé sur un
+                                        téléphone de 360 px, avant ce lot ;
+       0,78rem / 0,25rem (retenu)     → 348 px à 360, 374 à 390  ⇒ tient partout.
+     Plus lisible ET plus sûr que l'existant sur les deux largeurs. Cible : 54,1 px. */
+  .onglets a,
+  .onglets span {
+    flex-direction: column;
+    gap: 0.15rem;
+    border: none;
+    padding: 0.2rem 0.25rem;
+    font-size: 0.78rem;
+  }
+  .onglets span[aria-current="page"] {
+    background: none;
+    color: var(--accent);
+  }
+  /* La barre fixe mange le bas de l'écran : le contenu garde sa respiration. */
+  body {
+    padding-bottom: 4.6rem;
+  }
+}
+
+/* ── Le fil mêlé d'Activité ─────────────────────────────────────────────────────────── */
+.fil {
+  list-style: none;
+  margin: 0.3rem 0 1rem;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+.evenement {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas:
+    "quand ou liens"
+    "combien combien duree";
+  gap: 0.1rem 0.8rem;
+  align-items: baseline;
+  padding: 0.55rem 0.75rem;
+  border-radius: 12px;
+  border: 1px solid var(--bordure);
+  background: var(--surface);
+}
+.evenement .quand {
+  grid-area: quand;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.evenement .ou {
+  grid-area: ou;
+  color: var(--texte-doux);
+  font-size: 0.88rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.evenement .combien {
+  grid-area: combien;
+  font-size: 0.88rem;
+}
+.evenement .duree {
+  grid-area: duree;
+  font-size: 0.85rem;
+  color: var(--texte-doux);
+  text-align: right;
+}
+.evenement .liens {
+  grid-area: liens;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.ev-recharge {
+  border-left: 3px solid var(--succes-texte);
+}
+.ev-recharge .ico-recharge {
+  color: var(--succes-texte);
+  margin-right: 0.3rem;
+  vertical-align: -2px;
+}
+.panneau-trajet {
+  margin: 0.4rem 0 0.8rem;
+}
+
+/* La carte Google du trajet — plus haute que la mini-carte de l'accueil. */
+.carte-google-trajet {
+  aspect-ratio: 16 / 9;
+}
+
+/* La ZONE PARCOURUE n'a pas de rapport fixe : l'image arrive déjà à la forme des points
+   (`cadrePourPoints`, lib/carteStatique.ts). Lui imposer un 16/9 la ferait rogner par
+   `object-fit: cover` — c'est-à-dire couper des trajets, silencieusement. On laisse donc
+   l'image imposer sa forme, `width`/`height` venant du cadre.
+
+   ⚠️ ET ELLE PREND TOUTE LA LARGEUR. Une première version bornait la HAUTEUR
+   (`max-height`) avec `width: auto` : sur une donnée portrait, l'image tombait à ~275 px
+   de large dans une carte de 850 px — « trop petit, impossible à lire » (Marc, 20/08).
+   Le détail gagné dans le fichier était jeté au rendu. C'est la LARGEUR qui est
+   abondante à l'écran et la hauteur qui est rare, d'où `RATIO_MIN = 1` côté image (jamais
+   plus étroit qu'un carré) et une largeur pleine ici, bornée pour qu'un très grand écran
+   ne produise pas un carré de 1 300 px de haut.
+
+   Mesuré au banc (Chromium + ce fichier), écran de la capture de Marc : 409×544 avant,
+   768×768 après. Compromis assumé sur TÉLÉPHONE (390 px) : 325×433 avant, 325×325 après —
+   la largeur y est déjà pleine, donc un cadre portrait y gagnait un quart de hauteur.
+   Le carré sert l'écran large, où le défaut a été signalé ; si le téléphone devient le
+   cas gênant, la réponse est un `<picture>` avec deux URL (le navigateur n'en charge
+   qu'une, donc aucun appel Google supplémentaire), pas un retour en arrière ici. */
+/* La carte Google VIVANTE (Maps JavaScript API). Le SDK dessine DANS ce conteneur : il lui
+   faut une hauteur DÉFINIE, sinon la carte se rend sur 0 px et l'écran reste vide sans la
+   moindre erreur. D'où l'`aspect-ratio` (largeur pleine × 4/3), borné en hauteur pour ne
+   pas manger un écran entier — on peut zoomer, la taille n'a plus à tout montrer.
+   ⚠️ Pas de `filter` ici : celui de `.carte-google` assombrit l'image d'une carte FIGÉE,
+   ce qui est inoffensif — sur une carte vivante il assombrirait aussi ses commandes. */
+.carte-google-vivante {
+  aspect-ratio: 4 / 3;
+  max-height: 36rem;
+  filter: none;
+}
+
+.carte-google-zone {
+  width: 100%;
+  height: auto;
+  aspect-ratio: auto;
+  max-width: 48rem;
+  margin-inline: auto;
+}
+
+/* ── Le curseur de limite de charge (feuille du schéma) ─────────────────────────────── */
+.curseur-limite {
+  width: 100%;
+  accent-color: var(--accent);
+}
+@media (max-width: 700px) {
+  /* Le lieu passait à la trappe (ellipsis à zéro largeur) : sur téléphone, chaque rangée
+     du fil s'empile — l'heure et le prix en tête, le lieu dessous, pleine largeur. */
+  .evenement {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "quand liens"
+      "ou ou"
+      "combien duree";
+  }
+
+  /* ⚠️ LES DEUX SEULES ACTIONS DU FIL ÉTAIENT DES CIBLES DE 16 PX DE HAUT.
+     Mesuré au banc Chromium sur le VRAI `globals.css` et le balisage exact de
+     `LigneTrajet` : « Voir » 26 × 16 px, « Maps » 36 × 16 px — à 360 comme à 390 px, et
+     ce sont les liens qu'on tape à CHAQUE consultation (« Voir » met le trajet sur la
+     carte, « Maps » ouvre l'itinéraire). Le minimum tenable au doigt est 44 px : on
+     visait à un peu plus du tiers.
+
+     `min-width` AUTANT que `min-height` : une cible de 26 px de large se rate
+     latéralement même quand elle est haute. `justify-content: flex-end` garde la colonne
+     alignée à droite comme avant — la rangée ne se décale pas. Le séparateur « · » entre
+     les deux liens vient du JSX : c'est lui qui fournit l'écart empêchant de toucher
+     l'un en visant l'autre.
+
+     Coût mesuré : +12 px par rangée du fil (la première ligne de la grille passe de 26 à
+     44 px). C'est le prix d'une cible tapable, et il est payé là où il sert. */
+  .evenement .liens {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.15rem;
+  }
+  .evenement .liens a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    min-width: 44px;
+    padding-inline: 0.3rem;
+  }
+
+  /* ⚠️ LES DEUX CHAMPS DE DATE ÉTAIENT À 14,1 PX, et c'est la définition même de « les
+     formulaires sont pénibles » : sous 16 px, iOS ZOOME la page à la mise au point du
+     champ. Le champ devient énorme, le reste sort de l'écran, et il faut repincer pour
+     revenir — à chaque fois qu'on veut filtrer par date.
+     Leur HAUTEUR était déjà bonne (44 px mesurés) : c'est la police qu'il fallait
+     corriger, pas la cible. Le bouton suit pour que la rangée reste d'une seule taille.
+
+     La règle vise `.selecteur-fenetre .filtres` et pas `.filtres` seul : le formulaire
+     de lieu des Réglages a ses propres filtres, réglés par leur bloc à eux. */
+  .selecteur-fenetre .filtres input,
+  .selecteur-fenetre .filtres button {
+    font-size: 1rem;
+    min-height: 44px;
+  }
+
+  /* Le lien de secours d'un état vide (« Voir les 7 derniers jours », « Voir tout
+     l'historique ») est, à ce moment précis, la SEULE action de l'écran — et il faisait
+     16 px de haut. Il devient une vraie cible sur téléphone ; sur grand écran la classe
+     ne porte AUCUNE règle, donc le lien reste dans sa phrase, exactement comme avant. */
+  .lien-action {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding-inline: 0.15rem;
+  }
+}
+
+/* Valeur à recopier (jeton MCP, URL de connecteur) : lisible, sélectionnable, et qui ne
+   déborde jamais — un jeton de 32 caractères sur un téléphone casse la mise en page si on
+   ne le laisse pas revenir à la ligne. `break-all` et pas `break-word` : une suite
+   aléatoire n'a aucun point de coupure naturel. */
+.copiable {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0.4rem 0 0.8rem;
+}
+.copiable code {
+  flex: 1 1 14rem;
+  min-width: 0;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.78rem;
+  overflow-wrap: break-word;
+  word-break: break-all;
+  background: var(--surface);
+  border: 1px solid var(--bordure);
+  border-radius: 8px;
+  padding: 0.45rem 0.6rem;
+  user-select: all;
+}
+.copiable button {
+  flex: 0 0 auto;
+}
+
+
+/* ── CHOISIR UN LIEU DE RECHARGE (Marc, 21/08) ──────────────────────────────────────────
+   Le point n'est plus TAPÉ mais DÉSIGNÉ : sur la carte, ou par son adresse. */
+.choix-lieu {
+  display: grid;
+  gap: 0.6rem;
+  max-width: 44rem;
+  margin: 0.5rem 0 1rem;
+}
+.cl-adresse {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.cl-adresse label {
+  flex: 1 1 20rem;
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+.cl-adresse input {
+  font: inherit;
+  color: var(--texte);
+  background: var(--surface);
+  border: 1px solid var(--bordure);
+  border-radius: 8px;
+  padding: 0.45rem 0.6rem;
+  width: 100%;
+}
+.cl-adresse button {
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--surface);
+  background: var(--accent);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 0.5rem 1.1rem;
+}
+.cl-adresse button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Le retour du serveur — succès comme refus. Un refus MUET est le défaut qu'on corrige. */
+.cl-message {
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--rayon);
+  border-left: 3px solid var(--bordure);
+  background: color-mix(in srgb, var(--neutre) 6%, transparent);
+  font-size: 0.88rem;
+}
+.cl-message.ok {
+  border-left-color: var(--succes-texte);
+  color: var(--succes-texte);
+}
+.cl-message.erreur {
+  border-left-color: var(--erreur-texte);
+  color: var(--erreur-texte);
+}
+
+/* Le rayon d'appariement, à l'échelle réelle du terrain. Rempli très faiblement : il doit
+   se lire comme une ZONE, sans masquer les rues qu'il couvre. */
+.choix-lieu .cl-rayon {
+  fill: color-mix(in srgb, var(--accent) 16%, transparent);
+  stroke: var(--accent);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.choix-lieu .cl-point {
+  fill: var(--accent);
+  stroke: white;
+  stroke-width: 2;
+}
+.cl-rayon-champ {
+  display: grid;
+  gap: 0.25rem;
+}
+.cl-etat {
+  margin: 0;
+  font-size: 0.88rem;
+  font-feature-settings: "tnum";
+  font-variant-numeric: tabular-nums;
+  color: var(--texte-doux);
+}
+.cl-etat.vide {
+  color: var(--alerte-texte);
+}
+.form-lieu {
+  display: grid;
+  gap: 0.6rem;
+}
+
+/* ══ BOUTON « RAFRAÎCHIR MAINTENANT » (app/ui/BoutonRafraichir.tsx) ══════════════════ */
+/* `[UI-02]`. La question (« quand datent les données ») et le geste qui y répond vivent
+   sur la même ligne — séparés, ils se cherchent. */
+.maj-ligne {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+.rafraichir {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+}
+.bouton-rafraichir {
+  min-height: 44px; /* cible tactile — la règle des 44 px vaut pour ce bouton comme pour les autres */
+  padding: 0 0.9rem;
+  border: 1px solid var(--bordure);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--texte);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.bouton-rafraichir:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+.bouton-rafraichir:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+/* Vide au repos : la région reste montée pour que la PREMIÈRE annonce soit lue. */
+.rafraichir-retour {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--texte-doux);
+  min-height: 1.1em;
+}
+.rafraichir-retour.ton-ok {
+  color: var(--succes-texte);
+}
+.rafraichir-retour.ton-attention {
+  color: var(--alerte-texte);
+}
+.rafraichir-retour.ton-danger {
+  color: var(--erreur-texte);
+}
+
+/* ══ LA VOITURE EN 3D (18/09/2026) ════════════════════════════════════════════════════
+   Marc : « limite une interface 3D que je peux voir la voiture, tourner autour etc et voir
+   les états de chaque élément ».
+
+   ⚠️ Le bouton porte SON POIDS. Six mégaoctets qui partent sans prévenir, sur un forfait
+   mobile, ça se découvre sur une facture — pas dans une interface.
+
+   ⚠️ Aucun point de rupture NEUF ici : la règle des deux seuils tient
+   (`tests/pointsDeRupture.test.ts`). La vue s'adapte en unités de viewport, pas en media
+   queries — elle occupe l'écran, quel qu'il soit. */
+
+.v3d-ouvrir {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  margin: 0.6rem auto 0;
+  padding: 0 1rem;
+  border: 1px solid var(--bordure-nette);
+  border-radius: var(--rayon);
+  background: var(--surface-douce);
+  color: var(--texte);
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+.v3d-ouvrir:hover {
+  border-color: var(--accent);
+}
+.v3d-poids {
+  color: var(--texte-faible);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.v3d-plein {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  background: var(--fond);
+  /* La barre de gestes d'Android mange le bas : `dvh` suit la fenêtre RÉELLE. */
+  height: 100dvh;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.v3d-barre {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid var(--bordure);
+}
+.v3d-aide {
+  margin: 0;
+  color: var(--texte-doux);
+  font-size: 0.82rem;
+}
+.v3d-fermer {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 0.9rem;
+  border: 1px solid var(--bordure-nette);
+  border-radius: var(--rayon);
+  background: var(--surface);
+  color: var(--texte);
+  cursor: pointer;
+}
+
+.v3d {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.v3d-cadre {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  /* Le geste de rotation appartient à la scène : sans ça, le doigt fait défiler la page
+     derrière et la voiture ne tourne qu'une fois sur deux. */
+  touch-action: none;
+}
+.v3d-cadre canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.v3d-attente,
+.v3d-panne {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 1.2rem;
+  text-align: center;
+  color: var(--texte-doux);
+  font-size: 0.92rem;
+}
+.v3d-panne {
+  color: var(--erreur-texte);
+}
+
+/* Un marqueur est POSÉ sur la carrosserie : son point d'ancrage est son centre, sinon il
+   glisse vers le bas à droite de l'élément qu'il désigne. */
+.v3d-marqueur {
+  position: absolute;
+  transform: translate(-50%, -50%);
+}
+.v3d-pastille {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.18rem;
+  min-height: 44px;
+  padding: 0 0.7rem;
+  border: 1px solid var(--bordure-nette);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--fond) 82%, transparent);
+  backdrop-filter: blur(6px);
+  color: var(--texte);
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.v3d-pastille.ton-ok {
+  color: var(--succes-texte);
+  border-color: color-mix(in srgb, var(--succes-texte) 45%, transparent);
+}
+.v3d-pastille.ton-attention {
+  color: var(--alerte-texte);
+  border-color: color-mix(in srgb, var(--alerte-texte) 50%, transparent);
+}
+.v3d-pastille.ton-danger {
+  color: var(--erreur-texte);
+  border-color: color-mix(in srgb, var(--erreur-texte) 60%, transparent);
+}
+.v3d-pastille.ton-inconnu {
+  color: var(--inconnu);
+  border-style: dashed;
+}
+.v3d-unite {
+  font-size: 0.74rem;
+  color: var(--texte-doux);
+}
+
+.v3d-bulle {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 0.35rem);
+  transform: translateX(-50%);
+  width: min(18rem, 72vw);
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--bordure-nette);
+  border-radius: var(--rayon);
+  background: var(--surface-douce);
+  color: var(--texte-doux);
+  font-size: 0.84rem;
+  text-align: left;
+}
+.v3d-bulle strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: var(--texte);
+}
+.v3d-bulle p {
+  margin: 0.25rem 0 0;
+}
+
+/* Ce qui n'a pas de lieu sur une carrosserie : sous la vue, en clair. */
+.v3d-hors {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.35rem 1.1rem;
+  margin: 0;
+  padding: 0.6rem 0.9rem;
+  border-top: 1px solid var(--bordure);
+  list-style: none;
+  font-size: 0.84rem;
+}
+.v3d-hors li {
+  display: flex;
+  gap: 0.4rem;
+}
+.v3d-hors-libelle {
+  color: var(--texte-faible);
+}
+.v3d-hors-valeur {
+  color: var(--texte);
+  font-variant-numeric: tabular-nums;
+}
+
+/* La réserve sur la gauche et la droite du modèle : elle DIT ce qui n'est pas vérifié. */
+.v3d-reserve {
+  margin: 0;
+  padding: 0.5rem 0.9rem env(safe-area-inset-bottom);
+  border-top: 1px solid var(--bordure);
+  color: var(--alerte-texte);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+/* Page de connexion : titre à son nom, au thème sombre. Aucun point de rupture ajouté. */
+.login {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 28rem;
+  margin: 12vh auto 0;
+  padding: 0 1rem;
+}
+.login__title {
+  margin: 0;
+  font-size: clamp(2rem, 1.4rem + 3vw, 3rem);
+  letter-spacing: -0.02em;
+}
+.login__subtitle {
+  margin: 0;
+  color: var(--texte-doux);
+}
+.login__error {
+  color: var(--texte-doux);
+}
+
+/* ══ VOCABULAIRE COMMUN DU SOCLE (CarAI#217, 16/10/2026) ═════════════════════════════
+   Les classes d'app-template (`.bouton`, `.champ`, `.doux`, `.succes`, `.bandeau` …), pour
+   qu'un écran neuf s'écrive avec les mêmes mots dans toutes les apps. `.carte` est l'ancien
+   `.card`, renommé. Rien ici ne s'applique à un élément existant : aucune de ces classes
+   n'est posée dans le JSX d'aujourd'hui, donc aucun écran ne change.
+
+   ⚠️ CE QUE CARAI N'AJOUTE PAS, ET POURQUOI. `.alerte`, `.erreur` et `.pastille` existent déjà
+   ici comme MODIFICATEURS d'autres composants (`.verdict.alerte`, `.tuile.alerte`,
+   `.cl-message.erreur`, `.pastille.depart`). Une règle seule qui pose fond ET couleur les
+   restylerait tous, sans qu'aucune erreur ne se lève. Les paires d'état du socle restent
+   disponibles par leurs jetons (`--alerte-fond` / `--alerte-texte`, `--erreur-fond` /
+   `--erreur-texte`). `.etiquette` est prise par `.chiffres .etiquette`. La liste est tenue par
+   tests/theme.test.ts (PRIS_AILLEURS) : une exception sans raison écrite fait rougir le test. */
+.surtitre {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--repere);
+}
+.doux {
+  color: var(--texte-doux);
+}
+
+/* Boutons : cibles tactiles de 44 px minimum, la main est souvent occupée. */
+.bouton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 2.75rem;
+  padding: 0.625rem 1.125rem;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  line-height: 1.2;
+  text-decoration: none;
+  cursor: pointer;
+}
+.bouton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.bouton-principal {
+  background-color: var(--accent);
+  color: var(--sur-accent);
+}
+.bouton-principal:hover:not(:disabled) {
+  background-color: var(--accent-fonce);
+}
+.bouton-second {
+  background-color: var(--surface);
+  color: var(--texte);
+  border-color: var(--bordure-champ);
+}
+.bouton-second:hover:not(:disabled) {
+  background-color: var(--surface-douce);
+}
+.bouton-danger {
+  background-color: transparent;
+  color: var(--erreur-texte);
+  border-color: var(--erreur-texte);
+}
+
+/* Champ : 16 px, en dessous iOS zoome tout seul à la mise au point. */
+.champ {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.625rem 0.75rem;
+  background-color: var(--surface);
+  color: var(--texte);
+  border: 1px solid var(--bordure-champ);
+  border-radius: 12px;
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+.champ::placeholder {
+  color: var(--texte-doux);
+}
+
+/* États : fond sémantique ET libellé texte, jamais la couleur seule. */
+.succes {
+  background-color: var(--succes-fond);
+  color: var(--succes-texte);
+}
+.texte-succes {
+  color: var(--succes-texte);
+}
+.texte-erreur {
+  color: var(--erreur-texte);
+}
+
+/* Bandeau d'état : fond sémantique + contour de la même couleur (à combiner avec `.succes`). */
+.bandeau {
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid currentColor;
+}

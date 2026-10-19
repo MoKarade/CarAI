@@ -1,0 +1,1 @@
+CREATE INDEX "vehicle_snapshots_signal_date" ON "vehicle_snapshots" USING btree ("source","signal_code","recorded_at") WHERE signal_code IS NOT NULL;

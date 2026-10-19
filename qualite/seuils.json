@@ -1,0 +1,63 @@
+{
+  "_doc": "Seuils du cliquet (portes qualité de l'Atelier, S6). Valeurs mesurées le jour de la mise en place (Linux, Node 24.21) : l'existant est toléré, rien ne peut reculer. `npm run portes:maj` resserre un seuil quand le chiffre s'améliore ; le desserrer demande `--forcer` et une décision de Marc.",
+  "mis_a_jour": "2026-10-16",
+  "config": {
+    "app": "CarAI",
+    "lint": "eslint .",
+    "coeur": {
+      "libelle": "lib/",
+      "motif": "[\\\\/]lib[\\\\/]"
+    },
+    "archi": [
+      "app",
+      "lib",
+      "components"
+    ],
+    "vitest_args": ""
+  },
+  "portes": {
+    "typecheck.erreurs": {
+      "max": 0
+    },
+    "lint.erreurs": {
+      "max": 0
+    },
+    "lint.avertissements": {
+      "max": 0
+    },
+    "tests.echecs": {
+      "max": 0
+    },
+    "couverture.lignes_coeur": {
+      "min": 80.9
+    },
+    "couverture.lignes_global": {
+      "min": 54.3
+    },
+    "couverture.branches_global": {
+      "min": 51.2
+    },
+    "code_mort.problemes": {
+      "max": 127
+    },
+    "architecture.violations": {
+      "max": 0
+    }
+  },
+  "historique": [
+    {
+      "date": "2026-09-24",
+      "motif": "vitest 3 -> 5 : couverture V8 remappée « AST-aware » (Vitest 4+) et .tsx enfin comptés (oxc + jsx automatique) — même code, autre instrument ; décision de Marc du 24/09/2026",
+      "couverture_avant": {
+        "couverture.lignes_coeur": 78.8,
+        "couverture.lignes_global": 43.2,
+        "couverture.branches_global": 90
+      },
+      "couverture_apres": {
+        "couverture.lignes_coeur": 80.1,
+        "couverture.lignes_global": 52.9,
+        "couverture.branches_global": 49.9
+      }
+    }
+  ]
+}

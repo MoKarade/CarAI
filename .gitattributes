@@ -1,0 +1,15 @@
+# Fins de ligne LF partout, y compris sur une copie Windows.
+# Sans ça, git (core.autocrlf) convertit en CRLF au checkout sous Windows et des tests qui
+# lisent le texte source (ex. tests/activiteMobile.test.ts, tests/essentielAccueil.test.ts,
+# qui cherchent un motif contenant un `\n` littéral) échouent en local alors que la CI
+# (Linux) est verte. Même incident que BatchChef, 22/09/2026 ; mesuré ici le 29/09/2026 en
+# installant les portes qualité de l'Atelier.
+* text=auto eol=lf
+
+# Binaires RÉELLEMENT présents dans ce dépôt (mesuré via `git ls-files`), pas une liste
+# générique recopiée : un format absent aujourd'hui n'a pas sa place ici tant qu'il n'existe
+# pas dans le dépôt.
+*.png binary
+*.webp binary
+*.wasm binary
+*.glb binary

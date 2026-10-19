@@ -1,0 +1,261 @@
+name: CI
+
+# Ce fichier compte double : c'est le squelette des futures apps du hub. Ce qu'il
+# contient, chaque fork l'hérite ; ce qu'il oublie, chaque fork l'oublie. Les quatre
+# apps nées de ce template ont démarré sans CI — trois d'entre elles n'en ont eu une
+# qu'après coup, et l'une a laissé vivre une injection SQL en production faute de
+# quoi que ce soit qui se déclenche.
+#
+# Le job `gate` rejoue EXACTEMENT le gate du CLAUDE.md :
+#   npm run typecheck && npm run lint && npm run test && npm run build
+on:
+  # push sur la branche par défaut SEULEMENT : une branche de PR ne déclenche pas deux runs (push + PR). Étape 2 de la structure commune.
+  push:
+    branches: [main]
+  pull_request:
+  # Le cron ne sert qu'au job `audit` : une vulnérabilité paraît sans qu'une ligne
+  # n'ait changé. Lundi 12 h UTC.
+  schedule:
+    - cron: "0 12 * * 1"
+  workflow_dispatch:
+
+# Un run périmé d'une PR est annulé ; un push sur main (fusion) n'est JAMAIS annulé. Aucun `paths:` : un check requis filtré ne tournerait pas.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    # Plafond : sans lui, un job fige tourne SIX HEURES avant d'echouer (vecu sur
+    # DriveAI le 19/08/2026). Calibre sur la duree reelle — 2 min 14 s observe.
+    timeout-minutes: 15
+    name: Gate (typecheck · lint · tests · build)
+    if: github.event_name != 'schedule'
+    runs-on: ${{ github.event.repository.visibility == 'public' && 'ubuntu-latest' || fromJSON('["self-hosted","pc-marc"]') }} # dépôt public : machines GitHub (gratuites) ; privé : robot du PC
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0 # la voie rapide compare la PR à sa base (git diff)
+          # [CI-PERSIST-CREDS] `actions/checkout` v2+ écrit le GITHUB_TOKEN dans la config git du
+          # runner POUR TOUT LE RESTE DU RUN : n'importe quelle étape suivante, y compris une
+          # action tierce, peut le lire. Vérifié un par un : aucun workflow ne fait de
+          # `git push`, et la fusion automatique (Mergify, .mergify.yml) ne passe par aucun workflow.
+          persist-credentials: false
+
+      # La convention de compte-rendu est une COPIE synchronisée de
+      # claude-config/conventions/COMPTE-RENDU.md — un CLAUDE.md ne charge rien hors de son
+      # arbre, donc le renvoi seul ne chargerait rien. Une copie sans contrôle redevient une
+      # variante locale en silence : c'est le mode de panne que ce pas rend bruyant.
+      # Pour la faire évoluer : modifier la SOURCE, propager, mettre à jour cette empreinte.
+
+      # VOIE RAPIDE (modeles/ci de l'Atelier) : une PR de documentation seule saute install, tests et build ; ce job tourne TOUJOURS (jamais de `paths:` : le check
+      # requis serait absent). Échec fermé : doute = tout s'exécute. Garde copiée sous .github/ci (chemin sensible : attestation de pole-securite).
+      # Les documents LUS par un test ne comptent jamais comme docs : ils déclenchent tout.
+      - name: Voie rapide (PR de documentation seule ?)
+        id: voie
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          DOCS_LUES_PAR_LES_TESTS: CLAUDE.md,docs/claude/
+        run: node .github/ci/voie-rapide.mjs
+
+      # DOCUMENTATION LÉGÈRE : tourne TOUJOURS, même en voie rapide (quelques secondes) : CLAUDE.md <= 60 lignes / 10 Ko, docs/INDEX.md à jour, correspondances valides.
+      - name: Documentation légère
+        run: |
+          node .github/ci/verifier-longueur.mjs CLAUDE.md
+          node .github/ci/generer-index.mjs --verifier
+
+      - name: La convention de compte-rendu n'a pas dérivé
+        run: echo "97e36acba8770c9614b6295773267b9690d07bc5bcd130b3bc0d03da996ab62b  docs/COMPTE-RENDU.md" | sha256sum -c -
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        if: steps.voie.outputs.rapide != 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # `npm ci` et non `npm install` : le lockfile est committé et fait autorité.
+      # [CI-IGNORE-SCRIPTS] Et `--ignore-scripts` : un script d'installation de paquet
+      # s'exécute avec les droits du runner, qui porte les secrets du workflow. MESURÉ sur ce
+      # dépôt avant d'être posé : `npm ci --ignore-scripts` puis typecheck, build et
+      # 1 400 tests — tous verts.
+      - name: Dépendances
+        if: steps.voie.outputs.rapide != 'true'
+        run: npm ci --ignore-scripts
+
+      - name: Typecheck
+        if: steps.voie.outputs.rapide != 'true'
+        run: npm run typecheck
+
+      # `eslint .` et non `next lint`, déprécié et retiré dans Next 16. Le bloc
+      # `ignores` d'eslint.config.mjs est indispensable : sans lui, l'ESLint CLI scanne
+      # node_modules et .next (des milliers de faux positifs — mesuré chez JobAI : 4122).
+      - name: Lint
+        if: steps.voie.outputs.rapide != 'true'
+        run: npm run lint
+
+      - name: Tests
+        if: steps.voie.outputs.rapide != 'true'
+        run: npm run test
+
+      # Vérifié : le build ne demande AUCUNE variable d'environnement — un fork qui
+      # n'a encore configuré aucun secret voit quand même sa CI passer au vert.
+      - name: Build
+        if: steps.voie.outputs.rapide != 'true'
+        run: npm run build
+
+  audit:
+    # Plafond : sans lui, un job fige tourne SIX HEURES avant d'echouer (vecu sur
+    # DriveAI le 19/08/2026). Calibre sur la duree reelle — 27 s observe.
+    timeout-minutes: 10
+    name: Audit des dépendances de production
+    runs-on: ${{ github.event.repository.visibility == 'public' && 'ubuntu-latest' || fromJSON('["self-hosted","pc-marc"]') }} # dépôt public : machines GitHub (gratuites) ; privé : robot du PC
+    # Job SÉPARÉ du gate, volontairement : un avis de sécurité paraît sans qu'aucun
+    # commit n'ait eu lieu. Mêlé au gate, il peindrait un dépôt sain en rouge du jour
+    # au lendemain, et on prendrait l'habitude du rouge — c'est exactement ainsi
+    # qu'une CI cesse d'être lue (vécu chez JobAI : quatre commits rouges de suite
+    # sans que personne ne le voie). Séparés, « gate vert / audit rouge » se lit d'un
+    # coup d'œil et désigne la vraie cause.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0 # la voie rapide compare la PR à sa base (git diff)
+          # [CI-PERSIST-CREDS] `actions/checkout` v2+ écrit le GITHUB_TOKEN dans la config git du
+          # runner POUR TOUT LE RESTE DU RUN : n'importe quelle étape suivante, y compris une
+          # action tierce, peut le lire. Vérifié un par un : aucun workflow ne fait de
+          # `git push`, et la fusion automatique (Mergify, .mergify.yml) ne passe par aucun workflow.
+          persist-credentials: false
+
+      # VOIE RAPIDE (modeles/ci de l'Atelier) : une PR de documentation seule saute install, tests et build ; ce job tourne TOUJOURS (jamais de `paths:` : le check
+      # requis serait absent). Échec fermé : doute = tout s'exécute. Garde copiée sous .github/ci (chemin sensible : attestation de pole-securite).
+      # Les documents LUS par un test ne comptent jamais comme docs : ils déclenchent tout.
+      - name: Voie rapide (PR de documentation seule ?)
+        id: voie
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          DOCS_LUES_PAR_LES_TESTS: CLAUDE.md,docs/claude/
+        run: node .github/ci/voie-rapide.mjs
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        if: steps.voie.outputs.rapide != 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Dépendances
+        if: steps.voie.outputs.rapide != 'true'
+        run: npm ci --ignore-scripts
+
+      # `--omit=dev` : seules les dépendances qui partent en production comptent. Les
+      # avis sur l'outillage de développement ne menacent pas l'app et noieraient le
+      # signal.
+      - name: npm audit (production)
+        if: steps.voie.outputs.rapide != 'true'
+        run: npm audit --omit=dev
+
+  # ---------------------------------------------------------------------------------------
+  # Portes qualité de l'Atelier (S6, 23/09/2026) — même dispositif que le pilote BatchChef.
+  # Depuis la fusion automatique, une PR verte part en production sans relecture humaine :
+  # ces deux jobs sont ce qui garantit qu'elle ne fait RECULER ni la qualité ni la sécurité.
+  # Cliquet : qualite/seuils.json fige l'état au jour de la mise en place ; rien ne recule.
+  qualite:
+    timeout-minutes: 20
+    name: Qualité (lint · couverture · code mort · architecture)
+    # Le cron ne concerne que l'audit : inutile de rejouer ce job sur un code inchangé.
+    if: github.event_name != 'schedule'
+    runs-on: ${{ github.event.repository.visibility == 'public' && 'ubuntu-latest' || fromJSON('["self-hosted","pc-marc"]') }} # dépôt public : machines GitHub (gratuites) ; privé : robot du PC
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0 # la voie rapide compare la PR à sa base (git diff)
+          persist-credentials: false
+
+      # VOIE RAPIDE (modeles/ci de l'Atelier) : une PR de documentation seule saute install, tests et build ; ce job tourne TOUJOURS (jamais de `paths:` : le check
+      # requis serait absent). Échec fermé : doute = tout s'exécute. Garde copiée sous .github/ci (chemin sensible : attestation de pole-securite).
+      # Les documents LUS par un test ne comptent jamais comme docs : ils déclenchent tout.
+      - name: Voie rapide (PR de documentation seule ?)
+        id: voie
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          DOCS_LUES_PAR_LES_TESTS: CLAUDE.md,docs/claude/
+        run: node .github/ci/voie-rapide.mjs
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        if: steps.voie.outputs.rapide != 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Dépendances
+        if: steps.voie.outputs.rapide != 'true'
+        run: npm ci --ignore-scripts
+      - name: Portes qualité (cliquet)
+        if: steps.voie.outputs.rapide != 'true'
+        run: node qualite/portes.mjs
+      # La couverture (et chaque porte) s'affiche dans le résumé du job, pas seulement dans le journal.
+      # Lecture seule de qualite/rapport.json : le verdict reste celui de portes.mjs (étape ci-dessus).
+      - name: Résumé des portes
+        if: always() && steps.voie.outputs.rapide != 'true'
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            if (!fs.existsSync("qualite/rapport.json")) process.exit(0);
+            const r = JSON.parse(fs.readFileSync("qualite/rapport.json", "utf8"));
+            const l = ["### Portes qualité : " + r.verdict, "", "| Porte | Mesure | Seuil | Statut |", "|---|---|---|---|"];
+            for (const p of r.portes) l.push("| " + p.libelle + " | " + p.valeur + " | " + p.seuil + " | " + p.statut + " |");
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, l.join("\n") + "\n");
+          '
+      - name: Rapport
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: rapport-qualite
+          path: qualite/rapport.json
+          if-no-files-found: ignore
+
+  securite:
+    # Secrets dans tout l'historique qui serait fusionné — main + la PR, via HEAD (gitleaks) — + analyse
+    # statique du code (Semgrep). Les autres branches relèvent de l'audit, pas de la porte : sans
+    # --log-opts, gitleaks lirait `--all` et une vieille branche ferait rougir une PR qui n'y touche pas.
+    # Mesuré le 23/09/2026 : gitleaks 0 fuite sur l'historique (177 commits) ; Semgrep 0 résultat sur le code
+    # (.github exclu). Donc bloquant d'emblée (--error).
+    timeout-minutes: 10
+    name: Sécurité (secrets · analyse statique)
+    # Le cron ne concerne que l'audit : inutile de rejouer ce job sur un code inchangé.
+    if: github.event_name != 'schedule'
+    runs-on: ${{ github.event.repository.visibility == 'public' && 'ubuntu-latest' || fromJSON('["self-hosted","pc-marc"]') }} # dépôt public : machines GitHub (gratuites) ; privé : robot du PC
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0 # gitleaks lit l'historique complet, pas seulement le dernier commit
+          persist-credentials: false
+      # Binaire officiel, version et empreinte figées : un outil de sécurité téléchargé sans
+      # vérification serait lui-même une surface d'attaque.
+      - name: Secrets (gitleaks, historique complet)
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSfL -o gitleaks.tgz https://github.com/gitleaks/gitleaks/releases/download/v8.28.0/gitleaks_8.28.0_linux_x64.tar.gz
+          echo "a65b5253807a68ac0cafa4414031fd740aeb55f54fb7e55f386acb52e6a840eb  gitleaks.tgz" | sha256sum -c -
+          tar xzf gitleaks.tgz gitleaks
+          ./gitleaks git . --no-banner --redact --log-opts="--full-history HEAD"
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Analyse statique (Semgrep)
+        run: |
+          # --only-binary : aucune compilation ni script d'installation, seulement des roues publiées.
+          python -m pip install --quiet --only-binary :all: semgrep==1.177.0
+          semgrep scan --metrics off --error --exclude .github \
+            --config p/typescript --config p/react --config p/nextjs \
+            --config p/secrets --config p/owasp-top-ten .
+
+# ── Au fork ───────────────────────────────────────────────────────────────────
+# Rien à changer pour démarrer : ce fichier fonctionne tel quel. Quand l'app aura un
+# moteur, ajouter ses vérifications au job `gate` (jamais dans un job à part : ce qui
+# doit bloquer un merge vit dans le gate — seule exception, les portes Qualité et Sécurité
+# de l'Atelier, jobs à part par construction : la fusion automatique attend TOUS les checks). Et si le dépôt part sur `main` seulement,
+# la ligne `master` ci-dessus est sans effet — inutile de la retirer.
+#
+# GitHub désactive les workflows planifiés d'un dépôt resté 60 jours sans activité et
+# le signale par courriel : si l'audit hebdomadaire disparaît, c'est là qu'il faut
+# regarder, pas dans ce fichier.

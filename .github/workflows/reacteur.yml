@@ -1,0 +1,84 @@
+name: Réacteur
+
+# Réveille le Coordinateur (projet Apps de Marc), sans IA, quand une PR est
+# fusionnée, quand la CI d'une branche devient rouge ou quand une tâche (issue `niveau:tâche`) est
+# fermée (acceptée ou abandonnée : la fusion ne ferme plus l'issue, c'est la preuve qui la ferme),
+# au lieu d'un relevé toutes les X heures.
+# Plan : MoKarade/.github#42 et #139. Le workflow commun reveil-reacteur.yml (MoKarade/.github) lit le secret du dépôt
+# qui lance le réveil (jamais dans le code) ; plus aucun appel à une routine, donc plus de quota Claude.
+# Le message envoyé ne contient que des identifiants (dépôt, numéro de PR, empreinte), jamais un
+# titre ni un nom de branche : tout ce qui vient d'un tiers reste hors du texte.
+# Une tâche fermée ne réveille le Coordinateur que si le garde-fou de preuve (MoKarade/.github, cycle de vie §10 bis)
+# valide la fermeture ; sans preuve valide il rouvre l'issue et personne n'est réveillé.
+# PR ouverte (MoKarade/.github#157) : le même workflow commun ne réveille personne, il lance seulement le commentaire tâche liée,
+# qui marque `en-cours` la tâche citée par la PR (la prise est tracée par la machine, pas par la mémoire du fil).
+# Filet quotidien (MoKarade/.github#143) : chaque jour à 6 h (heure du Québec), le même workflow commun relit le dépôt avec le
+# jeton du job (PR rouge depuis plus de 30 min, incident ouvert, branche par défaut rouge) et ne réveille que s'il y a un signal.
+on:
+  pull_request:
+    types: [closed, opened, reopened, ready_for_review, edited]
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  issues:
+    types: [closed]
+  schedule:
+    # Filet quotidien à 6 h au Québec : 10 h UTC en heure d'été, 11 h UTC en heure d'hiver. Le script n'agit qu'à 6 h locale.
+    - cron: '0 10 * * *'
+    - cron: '0 11 * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  preuve:
+    name: Garde-fou de preuve
+    # Seules les issues `niveau:tâche` comptent ; chantiers et missions n'ont pas de preuve de ce type.
+    if: github.event_name == 'issues' && contains(github.event.issue.labels.*.name, 'niveau:tâche')
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+      deployments: read
+      actions: read
+    uses: MoKarade/.github/.github/workflows/preuve.yml@main
+    with:
+      numero: ${{ github.event.issue.number }}
+      runner: ${{ github.event.repository.visibility == 'public' && '"ubuntu-latest"' || '["self-hosted","pc-marc"]' }}
+      deploiement: vercel
+
+  reveiller:
+    name: Réveiller le Coordinateur
+    needs: preuve
+    # PR fusionnée, CI rouge hors robots (Dependabot : c'est Marc qui fusionne), ou tâche fermée ET prouvée
+    # (seules les issues `niveau:tâche` libèrent une app, et seulement si le garde-fou a validé la fermeture).
+    if: >-
+      always() && (
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true) ||
+      (github.event_name == 'pull_request' && github.event.action != 'closed' && github.event.pull_request.user.type != 'Bot') ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'failure' && github.event.workflow_run.actor.type != 'Bot') ||
+      (github.event_name == 'issues' && contains(github.event.issue.labels.*.name, 'niveau:tâche') && contains(fromJSON('["acceptee","abandon"]'), needs.preuve.outputs.statut)) ||
+      github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      checks: read
+      actions: write
+    # Workflow commun de MoKarade/.github (tâche MoKarade/.github#139) : filtre, relance une fois un échec de charge du
+    # robot, puis lance boite-reacteur.yml. Le jeton de réveil (secret du dépôt) lui est transmis sans être nommé ici.
+    uses: MoKarade/.github/.github/workflows/reveil-reacteur.yml@main
+    secrets: inherit
+    with:
+      runner: ${{ github.event.repository.visibility == 'public' && '"ubuntu-latest"' || '["self-hosted","pc-marc"]' }}
+      type: ${{ github.event_name == 'pull_request' && (github.event.action == 'closed' && 'pr_fusionnee' || 'pr_ouverte') || github.event_name == 'issues' && 'tache_fermee' || github.event_name == 'workflow_run' && 'ci_rouge' || 'filet' }}
+      depot: ${{ github.repository }}
+      pr: ${{ format('{0}', github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number) }}
+      issue: ${{ format('{0}', github.event.issue.number) }}
+      raison: ${{ github.event.issue.state_reason }}
+      evenement: ${{ github.event.workflow_run.event }}
+      sha: ${{ github.event.workflow_run.head_sha }}
+      run: ${{ format('{0}', github.event.workflow_run.id) }}
+      branche-run: ${{ github.event.workflow_run.head_branch }}
+      branche-defaut: ${{ github.event.repository.default_branch }}
+      forcer: ${{ github.event_name == 'workflow_dispatch' && 'true' || '' }}

@@ -1,0 +1,23 @@
+{
+  "_doc": "Configuration du commit-gate pour CarAI (à ne pas comparer par verifier-copies). La logique commune vit dans commit-gate.mjs + lib/analyseCommande.mjs. Configuration illisible ou invalide = le hook BLOQUE (échec fermé). Chaque commande est un TABLEAU d'arguments (jamais une chaîne shell) ; programmes autorisés : npm, node, python, python3.",
+  "sans_effet": ["\\.md$", "^docs/"],
+  "config_globale": [
+    "^(package(-lock)?\\.json|tsconfig[^/]*\\.json|vitest[^/]*\\.[cm]?[jt]s|eslint[^/]*)$",
+    "\\.css$"
+  ],
+  "etapes": [
+    { "nom": "typecheck", "commande": ["npm", "run", "typecheck"] },
+    {
+      "nom": "tests (affectés)",
+      "commande": ["npm", "test"],
+      "cible": {
+        "outil": ["node", "node_modules/vitest/vitest.mjs"],
+        "extensions": ["ts", "tsx", "mjs", "js"],
+        "args_related": ["related", "--run", "--passWithNoTests"],
+        "args_run": ["run"],
+        "toujours": []
+      }
+    },
+    { "nom": "build", "commande": ["npm", "run", "build"] }
+  ]
+}

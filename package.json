@@ -1,0 +1,72 @@
+{
+  "name": "carai",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Suivi complet du véhicule électrique (Toyota bZ 2026) — écosystème hub perso.",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "portes": "node qualite/portes.mjs",
+    "portes:maj": "node qualite/portes.mjs --maj",
+    "test:watch": "vitest",
+    "db:generate": "drizzle-kit generate",
+    "mcp:dev": "tsx mcp/stdio.ts",
+    "sentry:essai": "node scripts/sentry-essai.mjs"
+  },
+  "//migrations": "Les migrations s'appliquent au DÉMARRAGE de l'app (lib/migrations.ts), PAS via un script vercel-build. Choix du Doc 1 §4.1 : CarAI a des tâches de fond (webhooks Smartcar, poll Toyota) qui doivent pouvoir réparer le schéma sans redéploiement. Exigence de Marc : ne JAMAIS avoir à lancer une commande sur son PC. `db:generate` produit le SQL au moment du développement ; personne ne l'applique à la main.",
+  "//hub-contract": "Épinglé sur le TAG v1.5.0 (16/10/2026). Le contrat passe à zod 4 (hub-contract#56) : un seul zod 4 dans l'arbre, plus de copie zod 3. Sous-chemin /session (verifierSession, plan auth-asym-hubperso) depuis v1.4.0 ; le contrat /endpoint et /hub/summary n'a pas bougé. Ne JAMAIS redescendre sous v1.3.0 : les clés inconnues sont strippées SANS erreur, donc un pin antérieur ferait disparaître le bloc details et la déclaration de fraîcheur en silence — pas de message, juste un hub qui n'affiche plus rien de tout ça.",
+  "//jose": "Peer dependency OPTIONNELLE de @mokarade/hub-contract/session (^6.0.0) : requise seulement parce que CarAI importe ce sous-chemin (phase 1 de auth-asym-hubperso). Épinglée en direct plutôt que laissée en transitive de next-auth, qui n'en garantit pas la version.",
+  "//drizzle-orm": "Plancher de sécurité, jamais redescendu : >= 0.45.2 ferme GHSA-gpj5-g38j-94v9 (injection SQL par identifiants mal échappés, HIGH). Même plancher que BatchChef et JobAI.",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@mokarade/hub-contract": "github:MoKarade/hub-contract#v1.5.0",
+    "@neondatabase/serverless": "^1.1.0",
+    "@sentry/nextjs": "^11.8.0",
+    "@vercel/analytics": "^2.0.1",
+    "drizzle-orm": "^0.45.3",
+    "jose": "^6.2.12",
+    "next": "^16.4.1",
+    "next-auth": "^5.0.0-beta.31",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "three": "^0.186.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@sentry/node": "^11.8.0",
+    "@types/node": "^22.20.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/three": "^0.186.0",
+    "@vitest/coverage-v8": "^5.0.1",
+    "dependency-cruiser": "^18.4.0",
+    "drizzle-kit": "^0.31.11",
+    "eslint": "^9.18.0",
+    "eslint-config-next": "^16.4.1",
+    "knip": "^6.38.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.7.0",
+    "vitest": "^5.0.1"
+  },
+  "overrides": {
+    "postcss": "^8.5.24",
+    "sharp": "^0.35.3",
+    "nanoid": ">=3.3.17",
+    "@esbuild-kit/core-utils": {
+      "esbuild": "^0.25.12"
+    }
+  },
+  "//": [
+    "Planchers de version, jamais redescendus (convention ecosysteme) :",
+    "next >= 16.4.1 — GHSA-673q-mjm6-r5xr et GHSA-2464-fhr4-w9xw (RCE non authentifiee, CRITICAL), GHSA-p3m5-59mp-jv5r (DoS Server Actions, HIGH), 2026-10-14.",
+    "nanoid >= 3.3.17 — GHSA-2v37-7h3g-55p8 (HIGH, boucle infinie generateur custom), 2026-08-11.",
+    "postcss ^8.5.24 et sharp ^0.35.3 — failles fermees, herites du template.",
+    "esbuild ^0.25.12 sous @esbuild-kit/core-utils (via drizzle-kit) — GHSA-67mh-4wv8-2f99 (MODERATE, serveur de dev esbuild <= 0.24.2), 2026-10-15."
+  ]
+}

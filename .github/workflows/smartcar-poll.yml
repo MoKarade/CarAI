@@ -1,0 +1,146 @@
+# Poll périodique des signaux Smartcar — REMPLAÇANT GRATUIT du cron Vercel.
+#
+# ── POURQUOI CE FICHIER EXISTE ───────────────────────────────────────────────────────
+# Le webhook Smartcar ne se déclenche que sur CHANGEMENT (`SIGNAL_UPDATED`). Constaté le
+# 11/08/2026 dans le tableau de bord Smartcar : « Smartcar retrieved at 20:52 » (Smartcar
+# interroge bien le véhicule) mais « Vehicle updated at 17:05 » (la donnée n'a pas bougé).
+# Voiture stationnée ⇒ zéro livraison pendant des heures. Rien n'est cassé — mais CarAI
+# n'apprend rien, et l'écran semble figé.
+#
+# Ce poll va CHERCHER l'état courant à intervalle régulier. La déduplication structurelle
+# (index unique source + métrique + instant de mesure) garantit qu'il ne crée aucun
+# doublon avec le webhook : il comble les silences, il ne double pas le flux.
+#
+# Le plan Vercel Hobby n'autorise que des crons QUOTIDIENS (`0 */2 * * *` fait ÉCHOUER le
+# déploiement). GitHub Actions donne la fréquence voulue sans rien payer.
+#
+# ── ⚠️ CE WORKFLOW N'EST PLUS LE DÉCLENCHEUR PRINCIPAL — C'EST LE FILET ──────────────
+# Mesuré le 17/09/2026 sur les 60 derniers runs (8 → 17 septembre) :
+#
+#     passages demandés ........  48 / jour  (*/30)
+#     passages RÉELS ...........   6 / jour
+#     écart médian .............. 237 min
+#     écart MINIMUM ............. 121 min   ← jamais moins de deux heures
+#     écart maximum ............. 413 min
+#
+# Et les minutes de déclenchement sont réparties sur TOUT le cadran (6, 13, 24, 51…)
+# alors que le cron demande :00 et :30 — donc GitHub ne tente même pas à l'heure voulue,
+# il coalesce. Sur toute la vie du workflow : 536 runs en 37 jours, soit 14,5/jour. La
+# cadence de 30 min n'a jamais existé, et elle se dégrade.
+#
+# Ce que ça CASSE, et c'est le sujet : ni une recharge ni un trajet n'est mesuré par la
+# voiture — les deux sont DÉDUITS de relevés qui les encadrent. Une recharge commencée et
+# finie dans un silence de quatre heures ne laisse aucune trace. Marc, 17/09 : « trop long
+# entre les signaux, parfois je vois même pas une recharge ».
+#
+# ⚠️ Demander `*/15` n'y change rien : c'est le NOMBRE de runs qui est plafonné, pas leur
+# date. Et boucler à l'intérieur d'un run n'est pas payable — dépôt privé, 2 000 min/mois,
+# une boucle de 4 h coûterait 1 440 min PAR JOUR.
+#
+# ── LE DÉCLENCHEUR PRINCIPAL VIT DEHORS (décision de Marc, 17/09) ────────────────────
+# Un service de cron externe appelle la même route, aux 15 min :
+#
+#     URL ......... https://carai.hubperso.com/api/cron/smartcar-poll
+#     Méthode ..... GET
+#     En-tête ..... Authorization: Bearer <la valeur de CRON_SECRET dans Vercel>
+#     Intervalle .. 15 min
+#
+# (La route accepte aussi `x-cron-secret` si le service ne permet pas `Authorization`.)
+#
+# ⚠️ Cette configuration vit HORS du dépôt : aucun test ne peut la vérifier. Ce qui la
+# surveille est la cadence OBSERVÉE — page Données de l'app, et `expectedMaxAgeSec` publié
+# au hub. Un déclencheur invisible et une cadence non mesurée donneraient exactement le
+# silence qu'on vient de corriger.
+#
+# ── CADENCE : 15 MINUTES, ET C'EST UN ARBITRAGE DE COÛT ──────────────────────────────
+# Chaque poll lit tous les signaux souscrits, et certains sont FACTURABLES chez Smartcar
+# (badge `$` dans le tableau de bord). 15 min est la cible parce que la bZ ne se rafraîchit
+# qu'aux 30-60 min : sonder deux fois par rafraîchissement garantit qu'aucun état ne
+# vieillit de plus d'un quart d'heure, et sonder plus vite relirait la même mesure.
+# ⚠️ Le coût Smartcar de ce changement n'a PAS pu être mesuré depuis une session — le
+# domaine est filtré par la politique d'egress. Ce qui se vérifie depuis le navigateur de
+# Marc : https://carai.hubperso.com/analyse liste les signaux que la bZ refuse
+# systématiquement (`COMPATIBILITY`). Les retirer de la souscription est le geste qui
+# finance l'accélération — les payer pour recevoir une erreur est le pire des deux mondes.
+#
+# ⚠️ Le `cron` ci-dessous est le FILET, DÉCOUPLÉ depuis le 28/09/2026 du déclencheur
+# principal (`CADENCE_POLL_MINUTES`, service externe, 15 min, inchangé) pour préserver le
+# quota GitHub Actions. Il DOIT rester aligné sur `CADENCE_FILET_GITHUB_MINUTES`
+# (`lib/vehicle/cadence.ts`) : un filet qui vise une autre cadence que celle mesurée ferait
+# mentir toutes les mesures d'écart. Verrouillé par `tests/cadence.test.ts`.
+#
+# ── PRÉREQUIS (deux secrets de dépôt : Settings → Secrets and variables → Actions) ───
+#   CARAI_URL    = https://carai.hubperso.com
+#   CRON_SECRET  = la MÊME valeur que la variable CRON_SECRET de Vercel
+# Sans eux le workflow échoue FRANCHEMENT (plutôt que de tourner à vide en vert).
+
+name: Poll Smartcar
+
+on:
+  # Déclenchement manuel — pour valider la configuration avant de laisser tourner.
+  workflow_dispatch:
+
+  schedule:
+    - cron: "0 * * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  # Deux polls simultanés liraient deux fois les mêmes signaux : aucune donnée de plus,
+  # mais deux fois le quota consommé.
+  group: smartcar-poll
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    # Plafond : sans lui, un job fige tourne SIX HEURES avant d'echouer (vecu sur
+    # DriveAI le 19/08/2026). Calibre sur la duree reelle — non observe - job reseau.
+    timeout-minutes: 15
+    runs-on: [self-hosted, pc-marc]
+    steps:
+      - name: Lire les signaux et les enregistrer
+        env:
+          CARAI_URL: ${{ secrets.CARAI_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${CARAI_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::Secrets CARAI_URL et CRON_SECRET requis (voir l'en-tête de ce fichier)."
+            exit 1
+          fi
+
+          # -w écrit le code HTTP en dernière ligne : le corps ET le statut sont jugés.
+          # Un 200 seul ne prouverait rien — la route répond 200 même quand le poll
+          # échoue pour une cause en amont, et c'est voulu (ce n'est pas une panne de
+          # CarAI). C'est le champ `ok` du corps qui tranche.
+          reponse=$(curl -sS --max-time 90 -w '\n%{http_code}' \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${CARAI_URL}/api/cron/smartcar-poll")
+
+          statut=$(echo "$reponse" | tail -n1)
+          corps=$(echo "$reponse" | sed '$d')
+
+          echo "HTTP ${statut}"
+          echo "$corps"
+
+          # 401 = secret qui ne correspond pas ; 503 = CRON_SECRET absent côté Vercel.
+          # Les deux sont des erreurs de CONFIGURATION, pas des pannes du véhicule : elles
+          # doivent teindre le run en rouge, sinon personne ne les verra jamais.
+          if [ "$statut" = "401" ] || [ "$statut" = "503" ]; then
+            echo "::error::Configuration du cron incorrecte (HTTP ${statut})."
+            exit 1
+          fi
+
+          if [ "$statut" != "200" ]; then
+            echo "::error::Réponse inattendue (HTTP ${statut})."
+            exit 1
+          fi
+
+          # Un poll qui échoue en amont (quota, véhicule non connecté) est SIGNALÉ en
+          # avertissement : le run reste vert — ce n'est pas une régression de CarAI — mais
+          # le motif est lisible d'un coup d'œil dans l'onglet Actions.
+          if echo "$corps" | grep -q '"ok":false'; then
+            echo "::warning::Poll sans écriture — voir le champ 'raison' ci-dessus."
+          fi
