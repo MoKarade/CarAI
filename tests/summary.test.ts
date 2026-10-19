@@ -24,8 +24,8 @@ const SEPT_JOURS_AVANT = new Date(MAINTENANT.getTime() - 7 * 86_400_000);
 
 const BAIL = {
   debut: "2027-07-14",
-  dureeMois: 48,
-  kilometrageAutorise: 90_000,
+  dureeMois: 36,
+  kilometrageAutorise: 36_000,
   coutParKmExcedentaire: null,
   devise: "CAD",
 };

@@ -25,7 +25,7 @@ import { MESSAGE_BAIL_NON_RENSEIGNE } from "@/lib/vehicle/lease";
 const BAIL_FICTIF = {
   debut: "2027-03-02",
   dureeMois: 36,
-  kilometrageAutorise: 90_000,
+  kilometrageAutorise: 36_000,
   coutParKmExcedentaire: null,
   devise: "CAD",
   kilometrageInitial: 30,
@@ -67,7 +67,7 @@ describe("outil MCP etatBail", () => {
   it("chiffre normalement avec un bail en base", async () => {
     base.lignes = [{ value: BAIL_FICTIF }];
     const r = (await etatBail()) as { allocationTotale: number; resume: string };
-    expect(r.allocationTotale).toBe(90_000);
+    expect(r.allocationTotale).toBe(36_000);
     expect(r.resume).not.toBe(MESSAGE_BAIL_NON_RENSEIGNE);
   });
 });

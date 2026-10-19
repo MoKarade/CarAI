@@ -367,8 +367,8 @@ describe("resumerStatutsSignaux — la ventilation qui alimente le journal", () 
 describe("traceBail — le graphique qui décide (Doc 4 §3.4)", () => {
   const BAIL = {
     debut: "2027-07-14",
-    dureeMois: 48,
-    kilometrageAutorise: 90_000,
+    dureeMois: 36,
+    kilometrageAutorise: 36_000,
     coutParKmExcedentaire: null,
     devise: "CAD",
   };
@@ -392,7 +392,7 @@ describe("traceBail — le graphique qui décide (Doc 4 §3.4)", () => {
 
     // ⚠️ L'INVARIANT qui porte le sens : au rythme observé (3 400 km en 29 jours, soit
     // ~117 km/jour), la projection dépasse largement l'allocation — nettement plus que
-    // 90 000. Le trait de projection doit donc finir PLUS HAUT que celui du contrat,
+    // 36 000. Le trait de projection doit donc finir PLUS HAUT que celui du contrat,
     // c'est-à-dire à une ordonnée PLUS PETITE (l'axe Y est inversé en SVG). C'est
     // exactement l'écart que le cadrage annonçait et que ce graphique
     // existe pour rendre visible tôt.
@@ -401,7 +401,7 @@ describe("traceBail — le graphique qui décide (Doc 4 §3.4)", () => {
     expect(yFinProjete).toBeLessThan(yFinAlloue);
     // L'axe Y part de ZÉRO : la comparaison est absolue.
     expect(trace.reperes[0]!.valeur).toBe(0);
-    expect(trace.maxY).toBeGreaterThanOrEqual(90_000);
+    expect(trace.maxY).toBeGreaterThanOrEqual(36_000);
     // Le réel commence en bas à gauche et ne couvre qu'un mois sur quatre ans.
     expect(trace.reel.startsWith("0,100 ")).toBe(true);
     expect(trace.projection).not.toBeNull();
@@ -430,7 +430,7 @@ describe("traceBail — le graphique qui décide (Doc 4 §3.4)", () => {
     });
     const trace = traceBail({ etat, historique })!;
     // Sinon la droite du contrat sortirait du cadre et l'écart deviendrait invisible.
-    expect(trace.maxY).toBeGreaterThanOrEqual(90_000);
+    expect(trace.maxY).toBeGreaterThanOrEqual(36_000);
   });
 });
 
