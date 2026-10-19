@@ -15,8 +15,8 @@ const form = (champs: Record<string, string>) => ({
 
 const VALIDE = {
   debut: "2027-07-14",
-  dureeMois: "48",
-  kilometrageAutorise: "90000",
+  dureeMois: "36",
+  kilometrageAutorise: "36000",
   kilometrageInitial: "30",
   tarifKwh: "0.078",
   coutParKmExcedentaire: "0.15",
@@ -53,8 +53,8 @@ describe("lireReglages", () => {
     expect(r.erreurs).toEqual([]);
     expect(r.bail).toMatchObject({
       debut: "2027-07-14",
-      dureeMois: 48,
-      kilometrageAutorise: 90_000,
+      dureeMois: 36,
+      kilometrageAutorise: 36_000,
       kilometrageInitial: 30,
       tarifKwh: 0.078,
       coutParKmExcedentaire: 0.15,
@@ -140,8 +140,8 @@ describe("valeursFormulaireBail", () => {
     const r = lireReglages(form({ ...VALIDE, tarifKwh: "", coutParKmExcedentaire: "" }));
     expect(valeursFormulaireBail(r.bail!)).toEqual({
       debut: "2027-07-14",
-      dureeMois: "48",
-      kilometrageAutorise: "90000",
+      dureeMois: "36",
+      kilometrageAutorise: "36000",
       kilometrageInitial: "30",
       coutParKmExcedentaire: undefined,
       tarifKwh: undefined,
