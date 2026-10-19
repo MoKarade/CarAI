@@ -160,6 +160,6 @@ describe("aucune donnée personnelle dans les fichiers versionnés", () => {
     const dateBail = ["2026", "07", "14"].join("-");
     expect(empreintesInterdites(`autorisé : ${kmBail} km`)).toEqual(["(nombre interdit)"]);
     expect(empreintesInterdites(`signé le ${dateBail}`)).toEqual(["(date interdite)"]);
-    expect(empreintesInterdites("signé le 2027-07-14, 90 000 km")).toEqual([]);
+    expect(empreintesInterdites("signé le 2027-07-14, 36 000 km")).toEqual([]);
   });
 });
