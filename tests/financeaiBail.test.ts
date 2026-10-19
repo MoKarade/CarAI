@@ -17,7 +17,7 @@ const BAIL_OK = {
   bail: {
     nom: "bZ",
     devise: "CAD",
-    solde: 23000,
+    solde: 12000,
     mensualite: 500,
     tauxAnnuelPourcent: 0,
     montantOrigine: null,

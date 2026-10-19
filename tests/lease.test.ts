@@ -18,8 +18,8 @@ import type { EtatBail } from "@/lib/vehicle/lease";
 
 const BAIL = {
   debut: "2027-07-14",
-  dureeMois: 48,
-  kilometrageAutorise: 90_000,
+  dureeMois: 36,
+  kilometrageAutorise: 36_000,
   coutParKmExcedentaire: null,
   devise: "CAD",
 };
@@ -88,7 +88,7 @@ describe("rythmeKmParJour", () => {
 
 describe("calculerEtatBail", () => {
   it("projette un dépassement au rythme observé", () => {
-    // 100 km/jour sur 48 mois ≈ 146 000 km, largement au-dessus de 90 000.
+    // 100 km/jour sur 36 mois ≈ 109 600 km, bien au-dessus de 36 000.
     const etat = calculerEtatBail({
       bail: BAIL,
       historiqueOdometre: [
@@ -99,7 +99,7 @@ describe("calculerEtatBail", () => {
     });
 
     expect(etat.rythmeKmParJour).toBeCloseTo(100, 0);
-    expect(etat.projectionFinBail).toBeGreaterThan(90_000);
+    expect(etat.projectionFinBail).toBeGreaterThan(36_000);
     expect(etat.depassementProjete).toBeGreaterThan(0);
   });
 
@@ -137,7 +137,7 @@ describe("calculerEtatBail", () => {
       bail: BAIL,
       historiqueOdometre: [
         { km: 0, mesureLe: jour("2027-07-14") },
-        { km: 1100, mesureLe: jour("2027-08-05") },
+        { km: 500, mesureLe: jour("2027-08-05") },
       ],
       maintenant: jour("2027-08-05"),
     });
@@ -180,11 +180,11 @@ describe("calculerEtatBail", () => {
       maintenant: jour("2027-08-05"),
     });
 
-    // 22 jours sur ~1461 : le bail est à peine entamé. Comparer « 2 % consommé » à
+    // 22 jours sur ~1096 : le bail est à peine entamé. Comparer « 2 % consommé » à
     // « 1,5 % écoulé » a du sens ; comparer 2 % à 100 % n'en aurait aucun.
     expect(etat.ecoulePourcent).toBeGreaterThan(1);
     expect(etat.ecoulePourcent).toBeLessThan(3);
-    expect(etat.joursRestants).toBeGreaterThan(1400);
+    expect(etat.joursRestants).toBeGreaterThan(1000);
   });
 });
 
@@ -238,7 +238,7 @@ describe("calculerEtatBail — couverture de la mesure du rythme", () => {
     // Sans l'ancre, la projection sous-estimait le dépassement de dizaines de milliers de km.
     expect(sansAncre.rythmeKmParJour!).toBeLessThan(95);
     expect(avecAncre.rythmeKmParJour!).toBeGreaterThan(110);
-    expect(avecAncre.projectionFinBail!).toBeGreaterThan(sansAncre.projectionFinBail! + 40_000);
+    expect(avecAncre.projectionFinBail!).toBeGreaterThan(sansAncre.projectionFinBail! + 30_000);
     // Une fois ancré, plus rien à signaler sur la couverture.
     expect(avecAncre.limites.some((l) => l.includes("jour(s) d'historique"))).toBe(false);
   });
@@ -272,14 +272,14 @@ describe("rythmeRestantAutoriseKmParJour", () => {
       maintenant: jour("2027-08-12"),
     });
 
-    // Moyenne du contrat : 90 000 / 1461 ≈ 61,6 km/j — la même du premier au dernier jour.
-    expect(etat.rythmeAutoriseKmParJour).toBeCloseTo(61.6, 0);
+    // Moyenne du contrat : 36 000 / 1096 ≈ 32,8 km/j — la même du premier au dernier jour.
+    expect(etat.rythmeAutoriseKmParJour).toBeCloseTo(32.8, 0);
 
-    // Restant : (90 000 − 3 500) / jours restants. Déjà en avance, donc PLUS BAS que la
+    // Restant : (36 000 − 3 500) / jours restants. Déjà en avance, donc PLUS BAS que la
     // moyenne — c'est exactement l'information que la moyenne masque.
     expect(etat.rythmeRestantAutoriseKmParJour!).toBeLessThan(etat.rythmeAutoriseKmParJour);
     expect(etat.rythmeRestantAutoriseKmParJour!).toBeCloseTo(
-      (90_000 - 3500) / etat.joursRestants,
+      (36_000 - 3500) / etat.joursRestants,
       1,
     );
 
