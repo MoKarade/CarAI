@@ -104,23 +104,23 @@ describe("calculerBilan", () => {
   it("donne les km du jour, du mois, et la part du budget mensuel", () => {
     const bilan = calculerBilan({
       historiqueOdometre: historique,
-      allocationKm: 90_000,
-      dureeMois: 48,
+      allocationKm: 36_000,
+      dureeMois: 36,
       maintenant: new Date("2027-08-12T18:00:00Z"),
     });
 
     expect(bilan.kmAujourdhui).toBe(87);
     expect(bilan.kmCeMois).toBe(487);
-    // 90 000 / 48 mois = 1 875 km par mois.
-    expect(bilan.budgetMensuelKm).toBeCloseTo(1875, 0);
-    expect(bilan.partDuMoisPourcent!).toBeCloseTo((487 / (90_000 / 48)) * 100, 1);
+    // 36 000 / 36 mois = 1 000 km par mois.
+    expect(bilan.budgetMensuelKm).toBeCloseTo(1000, 0);
+    expect(bilan.partDuMoisPourcent!).toBeCloseTo((487 / (36_000 / 36)) * 100, 1);
   });
 
   it("n'invente rien quand l'odomètre manque", () => {
     const bilan = calculerBilan({
       historiqueOdometre: [],
-      allocationKm: 90_000,
-      dureeMois: 48,
+      allocationKm: 36_000,
+      dureeMois: 36,
       maintenant: new Date("2027-08-12T18:00:00Z"),
     });
     expect(bilan.kmAujourdhui).toBeNull();

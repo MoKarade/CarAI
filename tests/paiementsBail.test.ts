@@ -13,19 +13,19 @@ import type { TermesBail } from "@/lib/vehicle/lease";
 
 const TERMES: TermesBail = {
   debut: "2027-07-14",
-  dureeMois: 48,
-  kilometrageAutorise: 90_000,
+  dureeMois: 36,
+  kilometrageAutorise: 36_000,
   coutParKmExcedentaire: null,
   devise: "CAD",
 };
 
-// Mensualité FICTIVE, cohérente avec le solde : 23 000 / 46 versements restants. La cohérence
+// Mensualité FICTIVE, cohérente avec le solde : 12 000 / 24 versements restants. La cohérence
 // des trois chiffres est ce qui fait de ce cas un témoin utile.
 const MENSUALITE = 500;
 
 const chiffres = (over: Partial<ChiffresBail> = {}): ChiffresBail => ({
   mensualite: MENSUALITE,
-  solde: 23_000,
+  solde: 12_000,
   tauxAnnuelPourcent: 0,
   montantOrigine: null,
   debut: "2027-07-14",
@@ -37,15 +37,15 @@ const LE_15_SEPT = new Date("2027-09-15T14:00:00Z");
 describe("versementsDus", () => {
   it("compte les mois RÉVOLUS — le quantième de signature n'est pas encore atteint", () => {
     // Du 14/07 au 13/09 : le 2e mois n'est pas révolu.
-    expect(versementsDus(new Date("2027-07-14T00:00:00Z"), new Date("2027-09-13T00:00:00Z"), 48)).toBe(1);
+    expect(versementsDus(new Date("2027-07-14T00:00:00Z"), new Date("2027-09-13T00:00:00Z"), 36)).toBe(1);
     // Du 14/07 au 14/09 : il l'est.
-    expect(versementsDus(new Date("2027-07-14T00:00:00Z"), new Date("2027-09-14T00:00:00Z"), 48)).toBe(2);
+    expect(versementsDus(new Date("2027-07-14T00:00:00Z"), new Date("2027-09-14T00:00:00Z"), 36)).toBe(2);
   });
 
   it("ne compte rien avant le début, et jamais au-delà de la durée", () => {
     const debut = new Date("2027-07-14T00:00:00Z");
-    expect(versementsDus(debut, new Date("2027-07-01T00:00:00Z"), 48)).toBe(0);
-    expect(versementsDus(debut, new Date("2040-01-01T00:00:00Z"), 48)).toBe(48);
+    expect(versementsDus(debut, new Date("2027-07-01T00:00:00Z"), 36)).toBe(0);
+    expect(versementsDus(debut, new Date("2040-01-01T00:00:00Z"), 36)).toBe(36);
   });
 
   it("rend 0 sur une durée absurde plutôt que de lever", () => {
@@ -58,10 +58,10 @@ describe("paiementsBail — le calcul", () => {
     const p = paiementsBail({ termes: TERMES, chiffres: chiffres(), maintenant: LE_15_SEPT });
     expect(p).not.toBeNull();
     expect(p!.versementsFaits).toBe(2);
-    expect(p!.versementsTotal).toBe(48);
-    expect(p!.totalContrat).toBeCloseTo(48 * MENSUALITE, 2);
+    expect(p!.versementsTotal).toBe(36);
+    expect(p!.totalContrat).toBeCloseTo(36 * MENSUALITE, 2);
     expect(p!.payeContrat).toBeCloseTo(2 * MENSUALITE, 2);
-    expect(p!.fraction).toBeCloseTo(2 / 48, 6);
+    expect(p!.fraction).toBeCloseTo(2 / 36, 6);
   });
 
   it("le total NE VIENT PAS du montant financé — il reste mensualité × durée", () => {
@@ -72,8 +72,8 @@ describe("paiementsBail — le calcul", () => {
       chiffres: chiffres({ montantOrigine: 30_000, tauxAnnuelPourcent: 5 }),
       maintenant: LE_15_SEPT,
     });
-    expect(p!.totalContrat).toBeCloseTo(48 * MENSUALITE, 2);
-    expect(p!.fraction).toBeCloseTo(2 / 48, 6);
+    expect(p!.totalContrat).toBeCloseTo(36 * MENSUALITE, 2);
+    expect(p!.fraction).toBeCloseTo(2 / 36, 6);
   });
 });
 
@@ -93,7 +93,7 @@ describe("paiementsBail — ce qui rend null (jamais un zéro)", () => {
 
 describe("paiementsBail — les contrôles de cohérence", () => {
   it("AUCUNE réserve quand les trois chiffres concordent (anti-vacuité)", () => {
-    const p = paiementsBail({ termes: TERMES, chiffres: chiffres(), maintenant: LE_15_SEPT });
+    const p = paiementsBail({ termes: TERMES, chiffres: chiffres({ solde: 17_000 }), maintenant: LE_15_SEPT });
     expect(p!.reserves).toEqual([]);
   });
 
@@ -128,7 +128,7 @@ describe("paiementsBail — les contrôles de cohérence", () => {
   it("ne crie pas pour un arrondi — sous la tolérance, rien n'est dit", () => {
     const p = paiementsBail({
       termes: TERMES,
-      chiffres: chiffres({ montantOrigine: 48 * MENSUALITE + 40 }),
+      chiffres: chiffres({ solde: 17_000, montantOrigine: 36 * MENSUALITE + 40 }),
       maintenant: LE_15_SEPT,
     });
     expect(p!.reserves).toEqual([]);
