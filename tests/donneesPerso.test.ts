@@ -114,18 +114,21 @@ function coordonneesSuspectes(texte: string): string[] {
 }
 
 /** Mots et nombres dont l'empreinte est interdite. PURE. */
-function empreintesInterdites(texte: string): string[] {
+function empreintesInterdites(
+  texte: string,
+  ensembles = { mots: MOTS_INTERDITS, nombres: NOMBRES_INTERDITS, dates: DATES_INTERDITES },
+): string[] {
   const trouvees: string[] = [];
   for (const m of new Set(texte.toLowerCase().match(/[a-zà-ÿ]{4,}/g) ?? [])) {
-    if (MOTS_INTERDITS.has(sha(m))) trouvees.push("(mot interdit)");
+    if (ensembles.mots.has(sha(m))) trouvees.push("(mot interdit)");
   }
   // Séparateurs de milliers retirés, virgule décimale ramenée au point : « 47 169 » = « 47169 ».
   const normalise = texte.replace(/(?<=\d)[ _  ](?=\d{3}\b)/g, "").replace(/(?<=\d),(?=\d)/g, ".");
   for (const m of new Set(normalise.match(/\d+(?:\.\d+)?/g) ?? [])) {
-    if (m.length >= 4 && NOMBRES_INTERDITS.has(sha(m))) trouvees.push("(nombre interdit)");
+    if (m.length >= 4 && ensembles.nombres.has(sha(m))) trouvees.push("(nombre interdit)");
   }
   for (const m of new Set(texte.match(/\d{4}-\d{2}-\d{2}/g) ?? [])) {
-    if (DATES_INTERDITES.has(sha(m))) trouvees.push("(date interdite)");
+    if (ensembles.dates.has(sha(m))) trouvees.push("(date interdite)");
   }
   return trouvees;
 }
@@ -154,12 +157,14 @@ describe("aucune donnée personnelle dans les fichiers versionnés", () => {
   it("le détecteur détecte (preuve par l'exemple, valeurs fictives)", () => {
     expect(coordonneesSuspectes("lat: 47.1234, lng: -70.5678")).toEqual(["47.1234", "-70.5678"]);
     expect(coordonneesSuspectes("lat: 48.2, lng: -78.0001")).toEqual([]);
-    expect(empreintesInterdites("rien à voir ici, 12345 et 3.14159")).toEqual([]);
-    // Valeurs reconstruites : le verrou ne les écrit jamais d'un bloc, même dans ce fichier.
-    const kmBail = ["112", "000"].join(" ");
-    const dateBail = ["2026", "07", "14"].join("-");
-    expect(empreintesInterdites(`autorisé : ${kmBail} km`)).toEqual(["(nombre interdit)"]);
-    expect(empreintesInterdites(`signé le ${dateBail}`)).toEqual(["(date interdite)"]);
-    expect(empreintesInterdites("signé le 2027-07-14, 36 000 km")).toEqual([]);
+    const ensemblesFictifs = {
+      mots: new Set([sha("fictif")]),
+      nombres: new Set([sha("8888")]),
+      dates: new Set([sha("2099-01-01")]),
+    };
+    expect(empreintesInterdites("mot fictif ici", ensemblesFictifs)).toEqual(["(mot interdit)"]);
+    expect(empreintesInterdites("valeur 8888 km", ensemblesFictifs)).toEqual(["(nombre interdit)"]);
+    expect(empreintesInterdites("date 2099-01-01", ensemblesFictifs)).toEqual(["(date interdite)"]);
+    expect(empreintesInterdites("texte neutre sans rien", ensemblesFictifs)).toEqual([]);
   });
 });
