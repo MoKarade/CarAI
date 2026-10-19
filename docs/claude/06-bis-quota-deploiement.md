@@ -40,3 +40,23 @@ Ce qui en découle :
 - **Quand le quota est épuisé, « Redeploy » est un piège.** Il rejoue le commit du
   déploiement existant, PAS le dernier — on redéploie l'ancien code en croyant l'inverse.
   Le seul geste fiable est un nouveau push, puis comparer le SHA servi au SHA attendu.
+
+### Changer une variable d'environnement : « Redeploy » est annulé, un commit construit
+
+Constaté le 19/10/2026. Un changement de variable dans Vercel ne change AUCUN fichier. Le
+« Redeploy » du tableau de bord rejoue le même commit, dont la plage depuis le dernier build
+réussi ne contient que des tests ou de la doc : le script répond « build ignoré » et Vercel
+annule (`CANCELED`, code de sortie 0). Quatre déploiements de production d'affilée ont été
+annulés ainsi après le changement de `CRON_SECRET` ; la route du poll Smartcar répondait 401
+avec le nouveau secret. Le script avait appliqué sa règle correctement : c'est la règle qui
+ignorait ce cas.
+
+- **Pour appliquer une variable : une PR qui modifie `vercel-rebuild.txt`** (date et raison, jamais
+  une valeur). Le script le traite comme un fichier servi et construit. Une PR de tests ou de
+  doc, elle, reste sautée.
+- Redéployer le dernier déploiement déjà construit (plage vide) construit aussi : « aucun fichier
+  lisible dans le diff » lance le build. Redéployer un déploiement annulé ne construit pas.
+- Preuve que le build a eu lieu : l'état `READY` ET la réponse de la route concernée avec la
+  nouvelle valeur, pas seulement le déploiement.
+- Le test qui garde tout cela : `tests/buildNecessaire.test.ts` (rejoue le script sur un dépôt
+  jetable : doc, tests, outillage, fichier servi, commit enjambé, plage vide, mode Vercel).

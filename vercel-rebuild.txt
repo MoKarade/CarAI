@@ -1,0 +1,6 @@
+Ce fichier ne sert qu'à FORCER un build de production : le modifier fait construire le commit
+(scripts/build-necessaire.sh), alors qu'un commit de tests ou de documentation est sauté.
+À utiliser après un changement de variable d'environnement dans Vercel, qui ne change aucun
+fichier. Ne jamais y mettre de valeur : seulement la date et la raison.
+
+Dernière reconstruction demandée : 2026-10-19, nouvelle valeur de CRON_SECRET à appliquer.
