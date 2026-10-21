@@ -48,7 +48,16 @@ jobs:
           npm install --no-save --ignore-scripts playwright@1.56.1
           npx playwright install --with-deps chromium
 
-      - name: Lire l'écran avec la session d'essai
+      - name: Lire l'écran avec la session d'essai (6 jours de relevés : la prévision se tait)
+        run: npm run preuve:ecran -- preuve-ecran
+
+      # CarAI#31 : avec 30 jours de relevés, la prévision de fin de mois doit apparaître, en
+      # fourchette. Joué même si le premier contrôle a échoué : les deux résultats se lisent.
+      - name: Lire l'écran avec 30 jours de relevés (la prévision s'affiche)
+        if: always()
+        env:
+          PREUVE_JOURS: "30"
+          PREUVE_NOM: tendances-30-jours
         run: npm run preuve:ecran -- preuve-ecran
 
       - name: Joindre la capture et ce qui a été lu

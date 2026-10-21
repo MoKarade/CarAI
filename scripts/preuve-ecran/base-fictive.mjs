@@ -7,6 +7,10 @@
 //
 // ⚠️ Aucune de ces valeurs n'est une mesure : un trajet type de 40 km à 17 kWh/100 km, une
 // recharge la nuit. Elles existent pour que l'écran ait quelque chose à tracer.
+//
+// Le rythme change d'une semaine à l'autre (×1, ×0,7, ×1,3, du plus récent au plus ancien) : une
+// prévision de fin de mois (CarAI#31) donne une FOURCHETTE, et sur un rythme parfaitement
+// régulier elle se réduirait à un point que rien ne permettrait de distinguer d'un bug.
 
 import http from "node:http";
 import { resolve } from "node:path";
@@ -17,6 +21,9 @@ import { migrate } from "drizzle-orm/pglite/migrator";
 const CAPACITE_KWH = 71.4;
 const KM_PAR_DEMI_HEURE = 20;
 const KWH_PAR_100_KM = 17;
+
+/** Facteur de rythme du bloc de 7 jours (0 = le plus récent) auquel appartient l'instant `t`. */
+const FACTEURS_SEMAINE = [1, 0.7, 1.3];
 
 /** Pas de 30 min sur `jours` jours se terminant à `fin`. PURE, sauf `Date`. */
 export function relevesFictifs({ fin = new Date(), jours = 6 } = {}) {
@@ -36,8 +43,10 @@ export function relevesFictifs({ fin = new Date(), jours = 6 } = {}) {
     const enCharge = h >= 22 || h < 1;
 
     if (enRoute) {
-      km += KM_PAR_DEMI_HEURE;
-      soc -= ((KM_PAR_DEMI_HEURE * KWH_PAR_100_KM) / 100 / CAPACITE_KWH) * 100;
+      const semaine = Math.floor((fin.getTime() - t) / (7 * 86_400_000));
+      const parPas = KM_PAR_DEMI_HEURE * FACTEURS_SEMAINE[semaine % FACTEURS_SEMAINE.length];
+      km += parPas;
+      soc -= ((parPas * KWH_PAR_100_KM) / 100 / CAPACITE_KWH) * 100;
     } else if (enCharge) {
       soc = Math.min(90, soc + 6);
     }
@@ -85,10 +94,10 @@ async function executer(client, { query, params }) {
 }
 
 /** Démarre la base et son serveur HTTP. Rend `{ port, arreter }`. */
-export async function demarrerBaseFictive({ port = 0 } = {}) {
+export async function demarrerBaseFictive({ port = 0, jours } = {}) {
   const client = new PGlite();
   await migrate(drizzle(client), { migrationsFolder: resolve(process.cwd(), "drizzle") });
-  await remplir(client, relevesFictifs());
+  await remplir(client, relevesFictifs({ jours }));
 
   const serveur = http.createServer(async (req, rep) => {
     const morceaux = [];

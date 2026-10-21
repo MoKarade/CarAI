@@ -44,6 +44,7 @@ import {
   estMuette,
   libelleReleves,
   serieCourbe,
+  LIMITE_HISTORIQUE_COMPLET,
   serieNumerique,
   seriesPneus,
   sousEchantillonner,
@@ -62,6 +63,11 @@ import {
   serieConsommation,
   type Consommation,
 } from "@/lib/vehicle/consommation";
+import {
+  FENETRE_PREVISION_JOURS,
+  previsionFinDeMois,
+  type PrevisionFinDeMois,
+} from "@/lib/vehicle/prevision";
 import { lireEtatVehicule, type MesureQualifiee } from "@/lib/vehicle/state";
 import { historiqueOdometre } from "@/lib/vehicle/history";
 import { MESSAGE_BAIL_NON_RENSEIGNE, calculerEtatBail, resumerBail } from "@/lib/vehicle/lease";
@@ -321,6 +327,45 @@ function ConsommationReelle({ conso }: { conso: Consommation }) {
         Calculé sur {conso.nbSegments} segment(s) où l’odomètre avance et la charge baisse —
         une recharge n’est jamais comptée comme une consommation. C’est un <strong>plafond
         honnête</strong> : la décharge à l’arrêt y est incluse.
+      </p>
+    </>
+  );
+}
+
+/**
+ * LA PRÉVISION DE FIN DE MOIS (CarAI#31) : une ESTIMATION qui prolonge le rythme des 30 derniers
+ * jours, en fourchette (semaine la plus calme à la plus chargée). Absente, elle dit pourquoi.
+ * Jamais de dollars : aucun prix du kWh n'est mesuré.
+ */
+function PrevisionDuMois({ prevision }: { prevision: PrevisionFinDeMois }) {
+  if (!prevision.disponible) {
+    return <p className="hint">{prevision.raison}</p>;
+  }
+  const km = (n: number) => Math.round(n / 10) * 10;
+  const kwh = (n: number) => Math.round(n);
+  const plage = (bas: number, haut: number, unite: string) =>
+    bas === haut ? `${bas.toLocaleString("fr-CA")} ${unite}` : `${bas.toLocaleString("fr-CA")} à ${haut.toLocaleString("fr-CA")} ${unite}`;
+
+  return (
+    <>
+      <ul className="chiffres">
+        <li>
+          <span className="etiquette">Prévision de fin de mois (estimation)</span>
+          <span className="nombre">
+            {plage(km(prevision.kmMin), km(prevision.kmMax), "km")} ·{" "}
+            {plage(kwh(prevision.kwhMin), kwh(prevision.kwhMax), "kWh")}
+          </span>
+        </li>
+      </ul>
+      <p className="explication">
+        Estimation : le rythme des {FENETRE_PREVISION_JOURS} derniers jours prolongé sur les{" "}
+        {Math.ceil(prevision.joursRestants)} jour(s) qui restent, de la semaine la plus calme à
+        la plus chargée ({prevision.nbBlocs} semaines observées). Les kWh viennent de la
+        consommation mesurée ({prevision.kwhPar100km.toFixed(1)} kWh/100 km), sans coût en
+        dollars : aucun prix du kWh n’est mesuré.
+        {prevision.nbRejetes > 0
+          ? ` ${prevision.nbRejetes} relevé(s) d’odomètre incohérent(s) écarté(s).`
+          : ""}
       </p>
     </>
   );
@@ -679,6 +724,7 @@ export default async function Tendances({
   let bailRenseigne = true;
   let positions: PointPosition[] = [];
   let conso: Consommation | null = null;
+  let prevision: PrevisionFinDeMois | null = null;
   let soc: number | null = null;
   let autonomieKm: number | null = null;
   let odometreKm: number | null = null;
@@ -804,6 +850,26 @@ export default async function Tendances({
       capaciteKwh: capacite,
     });
 
+    // ── PRÉVISION DE FIN DE MOIS (CarAI#31) ──────────────────────────────────────────
+    // FENÊTRE FIXE de 30 jours, indépendante du sélecteur : « au rythme des 30 derniers jours »
+    // ne change pas parce qu'on regarde les dernières 24 h. D'où deux lectures dédiées plutôt
+    // que de réutiliser `odoBrut` et `socSerie`, qui suivent le filtre.
+    const debutPrevision = new Date(maintenant.getTime() - FENETRE_PREVISION_JOURS * 86_400_000);
+    const [odoPrevision, socPrevision] = await Promise.all([
+      historiqueOdometre({ granularite: "brut", debut: debutPrevision }),
+      serieNumerique("battery_soc", { depuis: debutPrevision, limite: LIMITE_HISTORIQUE_COMPLET }),
+    ]);
+    const conso30 = calculerConsommation({
+      odometre: odoPrevision,
+      socs: socPrevision.points.map((p) => ({ t: p.t, pourcent: p.valeur })),
+      capaciteKwh: capacite,
+    });
+    prevision = previsionFinDeMois({
+      odometre: odoPrevision,
+      kwhParCentKm: conso30.kwhPar100km,
+      maintenant,
+    });
+
     // ── DÉDUCTIONS — ce que les données disent sans le dire ──────────────────────────
     autonomie = comparerAutonomie({
       autonomieAnnonceeKm: autonomieKm,
@@ -921,6 +987,7 @@ export default async function Tendances({
               <section>
                 <h2>Consommation réelle</h2>
                 <ConsommationReelle conso={conso} />
+                {prevision && <PrevisionDuMois prevision={prevision} />}
               </section>
             )}
 
