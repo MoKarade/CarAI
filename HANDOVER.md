@@ -2,7 +2,21 @@
 
 > À lire en premier à chaque reprise de session.
 
-**Dernière mise à jour** : 2026-10-21 · branche `claude/tendances-consommation-en-haut`
+**Dernière mise à jour** : 2026-10-21 · branche `claude/prevision-fin-de-mois`
+
+## 21/10 — Prévision de fin de mois dans « Consommation réelle » (CarAI#31)
+
+Une ligne « Prévision de fin de mois (estimation) » : km et kWh d'ici la fin du mois (minuit du 1er, heure du
+Québec), en FOURCHETTE — du bloc de 7 jours le plus calme au plus chargé des 30 derniers jours (`lib/vehicle/prevision.ts`,
+`previsionFinDeMois`, pure). Fenêtre FIXE de 30 jours, deux lectures dédiées : elle ne suit pas le sélecteur de période.
+Elle se tait, avec la raison affichée, si : moins de 14 jours de relevés, dernier relevé de plus de 3 jours, aucun
+kilomètre, aucune consommation mesurée, ou plus d'un relevé d'odomètre sur dix incohérent. Un relevé qui recule ou
+implique plus de 250 km/h est écarté et compté. Pas de dollars : aucun prix du kWh n'est mesuré. ⚠️ Écart avec le
+texte de l'issue : « aucune recharge mesurée » est lu comme « aucune CONSOMMATION mesurée » — les kWh viennent de la
+consommation (kWh/100 km), la bZ ne publie aucune énergie ajoutée. Le contrôle navigateur tourne maintenant deux fois
+(6 jours : elle se tait ; 30 jours : elle s'affiche en fourchette) ; la base fictive varie son rythme d'une semaine
+à l'autre pour que la fourchette ne soit pas un point. Verrous : `tests/previsionFinDeMois.test.ts`,
+`tests/ordreTendances.test.ts`, `tests/preuveEcran.test.ts`.
 
 ## 21/10 — Les écrans se prouvent par navigateur, sans la session de Marc (CarAI#44)
 
