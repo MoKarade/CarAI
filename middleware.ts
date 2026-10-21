@@ -12,7 +12,7 @@
 // ⚠️ Toute NOUVELLE route qui affiche des données doit rester DERRIÈRE ce garde : ne
 // jamais l'ajouter aux exclusions du matcher « pour dépanner ».
 //
-// ⚠️ CarAI exclut AUSSI trois routes appelées par des machines (webhooks Smartcar et OTP,
+// ⚠️ CarAI exclut AUSSI quelques routes appelées par des machines (webhooks Smartcar et OTP,
 // poll planifié). Elles portent leur propre authentification et sont énumérées UNE À UNE
 // dans `ROUTES_A_AUTH_PROPRE` (lib/authGuard.ts), jamais par préfixe de dossier.
 //
@@ -81,6 +81,6 @@ export const config = {
   // `tests/auth.test.ts` vérifie chaque route réelle ET ses voisins avec le compilateur de
   // matcher de Next lui-même.
   matcher: [
-    "/((?!hub/summary$|api/sante$|api/webhooks/smartcar$|api/webhooks/toyota-otp$|api/cron/toyota-poll$|api/cron/smartcar-poll$|api/mcp/authorize$|api/mcp/token$|api/mcp/register$|api/mcp/meta/as$|api/mcp/meta/pr$|api/mcp$|\\.well-known/oauth-authorization-server(?:/|$)|\\.well-known/oauth-protected-resource(?:/|$)|api/auth/|login(?:/|$)|_next/static/|_next/image$|favicon\\.ico$|manifest\\.webmanifest$|(?:.*/)?[^/]*\\.[^/]*$).*)",
+    "/((?!hub/summary$|api/sante$|api/webhooks/smartcar$|api/webhooks/toyota-otp$|api/cron/toyota-poll$|api/cron/smartcar-poll$|api/export/sauvegarde$|api/mcp/authorize$|api/mcp/token$|api/mcp/register$|api/mcp/meta/as$|api/mcp/meta/pr$|api/mcp$|\\.well-known/oauth-authorization-server(?:/|$)|\\.well-known/oauth-protected-resource(?:/|$)|api/auth/|login(?:/|$)|_next/static/|_next/image$|favicon\\.ico$|manifest\\.webmanifest$|(?:.*/)?[^/]*\\.[^/]*$).*)",
   ],
 };

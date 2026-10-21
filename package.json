@@ -17,7 +17,8 @@
     "db:generate": "drizzle-kit generate",
     "mcp:dev": "tsx mcp/stdio.ts",
     "sentry:essai": "node scripts/sentry-essai.mjs",
-    "preuve:ecran": "node scripts/preuve-ecran/lancer.mjs"
+    "preuve:ecran": "node scripts/preuve-ecran/lancer.mjs",
+    "restaurer:sauvegarde": "node scripts/restaurer-sauvegarde.mjs"
   },
   "//migrations": "Les migrations s'appliquent au DÉMARRAGE de l'app (lib/migrations.ts), PAS via un script vercel-build. Choix du Doc 1 §4.1 : CarAI a des tâches de fond (webhooks Smartcar, poll Toyota) qui doivent pouvoir réparer le schéma sans redéploiement. Exigence de Marc : ne JAMAIS avoir à lancer une commande sur son PC. `db:generate` produit le SQL au moment du développement ; personne ne l'applique à la main.",
   "//hub-contract": "Épinglé sur le TAG v1.5.0 (16/10/2026). Le contrat passe à zod 4 (hub-contract#56) : un seul zod 4 dans l'arbre, plus de copie zod 3. Sous-chemin /session (verifierSession, plan auth-asym-hubperso) depuis v1.4.0 ; le contrat /endpoint et /hub/summary n'a pas bougé. Ne JAMAIS redescendre sous v1.3.0 : les clés inconnues sont strippées SANS erreur, donc un pin antérieur ferait disparaître le bloc details et la déclaration de fraîcheur en silence — pas de message, juste un hub qui n'affiche plus rien de tout ça.",
