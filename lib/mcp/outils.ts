@@ -23,7 +23,12 @@
 //    une porte d'entrée. Même esprit que la règle des lieux côté écran.
 
 import { lireBail, lireLieux, type Lieu } from "@/lib/config";
-import { MESSAGE_BAIL_NON_RENSEIGNE, calculerEtatBail, resumerBail } from "@/lib/vehicle/lease";
+import {
+  MESSAGE_BAIL_NON_RENSEIGNE,
+  calculerEtatBail,
+  libelleDepassementProjete,
+  resumerBail,
+} from "@/lib/vehicle/lease";
 import { historiqueOdometre } from "@/lib/vehicle/history";
 import { historiquePositions } from "@/lib/vehicle/position";
 import { decouperTrajets, trajetsDansLaFenetre, type Trajet } from "@/lib/vehicle/trajets";
@@ -295,6 +300,14 @@ async function bail(): Promise<unknown> {
     allocationTotale: etat.allocationTotale,
     debut: iso(etat.debutBail),
     fin: iso(etat.finBail),
+    // En dollars seulement si le tarif est renseigné et qu'un dépassement est projeté : c'est
+    // une ESTIMATION (elle découle d'une projection), le libellé le dit.
+    ...(libelleDepassementProjete(etat) !== null && {
+      depassementProjeteKm: etat.depassementProjete,
+      coutDepassementProjete: etat.coutDepassementProjete,
+      devise: etat.devise,
+      coutDepassement: libelleDepassementProjete(etat),
+    }),
     // ⚠️ Les LIMITES disent ce que ce calcul ne sait pas. Les ignorer donnerait une
     // projection qui a l'air sûre alors qu'elle repose sur une fenêtre trop courte.
     limites: etat.limites,
@@ -403,7 +416,7 @@ export const OUTILS: OutilMcp[] = [
   {
     name: "bail",
     description:
-      "État du bail : kilométrage actuel, allocation, dates, et les limites de la projection.",
+      "État du bail : kilométrage actuel, allocation, dates, les limites de la projection et, si le tarif du km excédentaire est renseigné et qu'un dépassement est projeté, son coût estimé en dollars.",
     inputSchema: { type: "object", properties: {} },
     executer: () => bail(),
   },
