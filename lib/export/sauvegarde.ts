@@ -112,7 +112,7 @@ export function cleDepuisEnv(valeur: string | undefined): Buffer | null {
 
 export function chiffrer(clair: Buffer, cle: Buffer): Buffer {
   const iv = randomBytes(LONGUEUR_IV);
-  const chiffre = createCipheriv("aes-256-gcm", cle, iv);
+  const chiffre = createCipheriv("aes-256-gcm", cle, iv, { authTagLength: LONGUEUR_ETIQUETTE });
   chiffre.setAAD(ENTETE);
   const corps = Buffer.concat([chiffre.update(clair), chiffre.final()]);
   return Buffer.concat([ENTETE, iv, corps, chiffre.getAuthTag()]);
@@ -127,10 +127,12 @@ export function dechiffrer(fichier: Buffer, cle: Buffer): Buffer {
   if (fichier[MAGIE.length] !== VERSION) {
     throw new Error(`Version de lot inconnue (${fichier[MAGIE.length]}) : seule la version ${VERSION} est lue.`);
   }
+  // Longueur d'étiquette IMPOSÉE (16 octets) à la création du déchiffreur : sans elle, Node
+  // accepterait une étiquette tronquée, ce qui affaiblit l'authentification GCM.
   const iv = fichier.subarray(ENTETE.length, ENTETE.length + LONGUEUR_IV);
   const etiquette = fichier.subarray(fichier.length - LONGUEUR_ETIQUETTE);
   const corps = fichier.subarray(ENTETE.length + LONGUEUR_IV, fichier.length - LONGUEUR_ETIQUETTE);
-  const dechiffre = createDecipheriv("aes-256-gcm", cle, iv);
+  const dechiffre = createDecipheriv("aes-256-gcm", cle, iv, { authTagLength: LONGUEUR_ETIQUETTE });
   dechiffre.setAAD(ENTETE);
   dechiffre.setAuthTag(etiquette);
   try {
