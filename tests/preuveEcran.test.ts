@@ -8,6 +8,7 @@
 import { describe, expect, it } from "vitest";
 import { relevesFictifs } from "../scripts/preuve-ecran/base-fictive.mjs";
 import { calculerConsommation, serieConsommation } from "@/lib/vehicle/consommation";
+import { previsionFinDeMois } from "@/lib/vehicle/prevision";
 
 interface Releve {
   t: Date;
@@ -52,5 +53,43 @@ describe("relevesFictifs", () => {
     // Le scénario roule à 17 kWh/100 km : un calcul qui s'en écarte beaucoup est cassé.
     expect(conso.kwhPar100km!).toBeGreaterThan(15);
     expect(conso.kwhPar100km!).toBeLessThan(19);
+  });
+});
+
+// CarAI#31 : le contrôle de la prévision n'a de sens que si la base fictive la fait apparaître
+// (30 jours) ou la fait taire (6 jours) pour la bonne raison, et avec une VRAIE fourchette.
+describe("relevesFictifs et la prévision de fin de mois", () => {
+  const prevoir = (jours: number) => {
+    const rel: Releve[] = relevesFictifs({ fin: FIN, jours });
+    const odometre = rel
+      .filter((r) => r.metricType === "odometer")
+      .map((r) => ({ km: r.valeur as number, mesureLe: r.t }));
+    const socs = rel
+      .filter((r) => r.metricType === "battery_soc")
+      .map((r) => ({ t: r.t, pourcent: r.valeur as number }));
+    const conso = calculerConsommation({
+      odometre,
+      socs,
+      capaciteKwh: rel.find((r) => r.metricType === "battery_capacity_nominal")!.json!.capacity,
+    });
+    return previsionFinDeMois({
+      odometre,
+      kwhParCentKm: conso.kwhPar100km,
+      maintenant: new Date(FIN.getTime() + 60_000),
+    });
+  };
+
+  it("sur 30 jours : une prévision disponible, en fourchette (le rythme varie d'une semaine à l'autre)", () => {
+    const p = prevoir(30);
+    if (!p.disponible) throw new Error(p.raison);
+    expect(p.kmMin).toBeLessThan(p.kmCentral);
+    expect(p.kmCentral).toBeLessThan(p.kmMax);
+    expect(p.kwhMin).toBeLessThan(p.kwhMax);
+  });
+
+  it("sur 6 jours : absente, parce qu'il manque des jours de relevés", () => {
+    const p = prevoir(6);
+    expect(p.disponible).toBe(false);
+    if (!p.disponible) expect(p.raison).toMatch(/au moins 14/);
   });
 });

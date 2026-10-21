@@ -85,7 +85,7 @@ dans `.env.example` : le Garde-fou y lit une référence à un secret et attend 
 
 ```
 EXPORT_KEY=… RESTAURATION_DATABASE_URL=<base d'ESSAI migrée et vide> \
-  node scripts/restaurer-sauvegarde.mjs <dossier-des-fichiers-.carai>
+  npm run restaurer:sauvegarde -- <dossier-des-fichiers-.carai>
 ```
 
 Tout est déchiffré et vérifié avant la première écriture ; une mauvaise clé ou un fichier altéré n'écrit rien. La cible se

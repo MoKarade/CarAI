@@ -68,4 +68,35 @@ describe("ordre des blocs de /tendances", () => {
   it("sans segment retenu, une ligne dit pourquoi au lieu d'une courbe inventée", () => {
     expect(rendu).toContain("Pas de courbe de consommation sur cette période");
   });
+
+  // CarAI#31 : la prévision de fin de mois est une ligne du bloc « Consommation réelle », à la
+  // suite des chiffres mesurés, avant l'état du véhicule.
+  it("la prévision de fin de mois suit la consommation, dans le même bloc", () => {
+    const conso = place("<ConsommationReelle conso={conso} />");
+    const prev = place("<PrevisionDuMois prevision={prevision} />");
+    expect(prev).toBeGreaterThan(conso);
+    expect(prev).toBeLessThan(place("<h2>Le véhicule maintenant</h2>"));
+  });
+
+  // « Au rythme des 30 derniers jours » : la fenêtre ne suit PAS le sélecteur de période, sinon
+  // regarder les dernières 24 h ferait prévoir un mois à partir d'une journée.
+  it("la prévision lit sa propre fenêtre de 30 jours, pas celle du sélecteur", () => {
+    const debut = source.indexOf("const debutPrevision");
+    expect(debut, "la fenêtre fixe de la prévision a disparu").toBeGreaterThan(-1);
+    const bloc = source.slice(debut, source.indexOf("prevision = previsionFinDeMois("));
+    expect(bloc).toContain("FENETRE_PREVISION_JOURS");
+    expect(bloc).toContain("debut: debutPrevision");
+    expect(bloc).toContain("depuis: debutPrevision");
+    expect(bloc).not.toMatch(/\bdepuis\b(?!: debutPrevision)/);
+  });
+
+  it("la prévision ne parle jamais de dollars (aucun prix du kWh n'est mesuré)", () => {
+    const composant = source.slice(
+      source.indexOf("function PrevisionDuMois"),
+      source.indexOf("La ZONE PARCOURUE"),
+    );
+    expect(composant.length).toBeGreaterThan(300);
+    expect(composant).not.toMatch(/style:\s*["']currency|CAD|\$\s*\d|\d\s*\$/);
+    expect(composant).toContain("aucun prix du kWh n’est mesuré");
+  });
 });

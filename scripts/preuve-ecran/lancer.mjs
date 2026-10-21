@@ -9,7 +9,10 @@
 //
 // Usage (après `npm run build`) : node scripts/preuve-ecran/lancer.mjs [dossier-de-sortie]
 //   PLAYWRIGHT_MODULE : chemin d'un module Playwright si le paquet n'est pas dans node_modules.
-// Sortie : preuve-tendances.png (capture) et preuve-tendances.json (ce qui a été lu).
+//   PREUVE_JOURS : durée des relevés fictifs (6 par défaut). Au moins 20 : la prévision de fin de
+//   mois (CarAI#31) doit apparaître, avec sa fourchette ; sinon elle doit se taire et dire pourquoi.
+//   PREUVE_NOM : nom des fichiers de sortie (« tendances » par défaut).
+// Sortie : preuve-<nom>.png (capture) et preuve-<nom>.json (ce qui a été lu).
 // Code de sortie : 0 si toutes les vérifications passent, 1 sinon.
 
 import { spawn } from "node:child_process";
@@ -21,6 +24,9 @@ import { encode } from "next-auth/jwt";
 import { demarrerBaseFictive } from "./base-fictive.mjs";
 
 const sortie = resolve(process.argv[2] ?? "preuve-ecran");
+const JOURS = Number(process.env.PREUVE_JOURS ?? 6);
+const NOM = process.env.PREUVE_NOM ?? "tendances";
+const PREVISION_ATTENDUE = JOURS >= 20;
 mkdirSync(sortie, { recursive: true });
 
 const PORT_APP = Number(process.env.PREUVE_PORT ?? 3917);
@@ -47,7 +53,7 @@ async function attendre(fn, delaiMs, message) {
   }
 }
 
-const base = await demarrerBaseFictive();
+const base = await demarrerBaseFictive({ jours: JOURS });
 const secret = randomBytes(32).toString("base64url");
 
 const app = spawn(resolve("node_modules/.bin/next"), ["start", "-p", String(PORT_APP), "-H", "127.0.0.1"], {
@@ -96,7 +102,13 @@ try {
   const courbes = await page.$$eval(".graphiques-lies figure.courbe figcaption", (els) =>
     els.map((e) => (e.textContent ?? "").trim().split("\n")[0]?.trim() ?? ""),
   );
-  await page.screenshot({ path: resolve(sortie, "preuve-tendances.png"), fullPage: true });
+  const prevision = await page.$$eval("main li", (els) =>
+    els.map((e) => (e.textContent ?? "").replace(/\s+/g, " ").trim()).filter((t) => t.startsWith("Prévision de fin de mois")),
+  );
+  const sansPrevision = await page.$$eval("main .hint", (els) =>
+    els.map((e) => (e.textContent ?? "").replace(/\s+/g, " ").trim()).filter((t) => t.startsWith("Pas de prévision de fin de mois")),
+  );
+  await page.screenshot({ path: resolve(sortie, `preuve-${NOM}.png`), fullPage: true });
 
   verifie("le premier titre de bloc est « Consommation réelle » (CarAI#30)", titres[0] === "Consommation réelle", titres.slice(0, 4));
   verifie(
@@ -111,7 +123,27 @@ try {
     courbes.slice(0, 4),
   );
 
-  writeFileSync(resolve(sortie, "preuve-tendances.json"), JSON.stringify({ titres, courbes, verifs }, null, 2));
+  if (PREVISION_ATTENDUE) {
+    // Une fourchette « A à B km · C à D kWh » : l'espace des milliers de fr-CA est insécable.
+    const ligne = prevision[0] ?? "";
+    verifie(
+      "la prévision de fin de mois s'affiche, en fourchette km et kWh, étiquetée estimation (CarAI#31)",
+      prevision.length === 1 &&
+        ligne.includes("(estimation)") &&
+        /\d \u00e0 [\d\s\u00a0\u202f]+ km · [\d\s\u00a0\u202f]+ \u00e0 [\d\s\u00a0\u202f]+ kWh/u.test(ligne.replace(/[\u00a0\u202f]/g, " ")) &&
+        !/\$/.test(ligne),
+      prevision,
+    );
+    verifie("la prévision ne se tait pas quand les relevés suffisent (CarAI#31)", sansPrevision.length === 0, sansPrevision);
+  } else {
+    verifie(
+      "avec moins de 14 jours de relevés, la prévision se tait ET dit pourquoi (CarAI#31)",
+      prevision.length === 0 && sansPrevision.length === 1 && /au moins 14/.test(sansPrevision[0] ?? ""),
+      { prevision, sansPrevision },
+    );
+  }
+
+  writeFileSync(resolve(sortie, `preuve-${NOM}.json`), JSON.stringify({ jours: JOURS, titres, courbes, prevision, sansPrevision, verifs }, null, 2));
   code = verifs.every((v) => v.ok) ? 0 : 1;
 } catch (e) {
   console.error(`ÉCHEC du contrôle : ${e?.message ?? e}`);
