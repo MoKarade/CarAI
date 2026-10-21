@@ -2,7 +2,15 @@
 
 > À lire en premier à chaque reprise de session.
 
-**Dernière mise à jour** : 2026-10-21 · branche `claude/depassement-en-dollars`
+**Dernière mise à jour** : 2026-10-21 · branche `claude/tendances-consommation-en-haut`
+
+## 21/10 — Tendances s'ouvre sur la consommation (CarAI#30)
+
+Choix de Marc (19/10) : « Consommation réelle » est le premier bloc de `/tendances`, avant « Le véhicule maintenant » ;
+les déductions restent. `tests/ordreTendances.test.ts` verrouille l'ordre dans le rendu de `app/tendances/page.tsx`, y
+compris la carte de la zone parcourue SOUS les courbes (elle y était déjà : la demande supposait le contraire). ⚠️ Il
+n'existe pas de courbe de consommation dans « Évolution » (la consommation est un bloc calculé, `lib/vehicle/consommation.ts`) :
+la mettre en première courbe est la tâche CarAI#41, pas faite ici.
 
 ## 21/10 — Le dépassement du forfait s'affiche en dollars (CarAI#7)
 
