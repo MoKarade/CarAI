@@ -4,6 +4,17 @@
 
 **Dernière mise à jour** : 2026-10-21 · branche `claude/tendances-consommation-en-haut`
 
+## 21/10 — Les écrans se prouvent par navigateur, sans la session de Marc (CarAI#44)
+
+`npm run preuve:ecran` (après `npm run build`) lance l'app construite avec une base FICTIVE (PGlite migrée par
+`drizzle/`, servie comme Neon en HTTP : `scripts/preuve-ecran/base-fictive.mjs`) et une session d'essai (cookie
+Auth.js signé avec un `AUTH_SECRET` tiré au hasard, adresse `essai@example.invalid`), puis lit `/tendances` avec
+Playwright. Il vérifie d'abord que SANS cookie la réponse reste 307 vers `/login` (le garde n'est pas touché), puis
+l'ordre des blocs (CarAI#30) et la première courbe (CarAI#41) ; il écrit `preuve-tendances.png` et `.json`.
+`.github/workflows/preuve-ecrans.yml` le rejoue après chaque fusion sur `main` (dépôt public seulement) et joint
+la capture en artefact. ⚠️ Un écran de plus à prouver = une vérification de plus dans `lancer.mjs`, pas un second
+contrôle ; les données fictives n'ont aucune donnée personnelle (verrou `tests/donneesPerso.test.ts`).
+
 ## 21/10 — Une courbe de consommation ouvre « Évolution » (CarAI#41)
 
 « Consommation (estimation) » est la première série des courbes liées de `/tendances` : un point par segment retenu
