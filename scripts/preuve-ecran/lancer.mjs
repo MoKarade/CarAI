@@ -12,6 +12,8 @@
 //   PREUVE_JOURS : durée des relevés fictifs (6 par défaut). Au moins 20 : la prévision de fin de
 //   mois (CarAI#31) doit apparaître, avec sa fourchette ; sinon elle doit se taire et dire pourquoi.
 //   PREUVE_NOM : nom des fichiers de sortie (« tendances » par défaut).
+//   PREUVE_ACTIVITE : 1 (par défaut quand la prévision n'est PAS attendue) lit aussi Activité et
+//   rejoue le geste « Nommer ce lieu » (CarAI#8) : la ligne avant, le nommage, la ligne après.
 // Sortie : preuve-<nom>.png (capture) et preuve-<nom>.json (ce qui a été lu).
 // Code de sortie : 0 si toutes les vérifications passent, 1 sinon.
 
@@ -27,6 +29,7 @@ const sortie = resolve(process.argv[2] ?? "preuve-ecran");
 const JOURS = Number(process.env.PREUVE_JOURS ?? 6);
 const NOM = process.env.PREUVE_NOM ?? "tendances";
 const PREVISION_ATTENDUE = JOURS >= 20;
+const LIRE_ACTIVITE = (process.env.PREUVE_ACTIVITE ?? (PREVISION_ATTENDUE ? "0" : "1")) === "1";
 mkdirSync(sortie, { recursive: true });
 
 const PORT_APP = Number(process.env.PREUVE_PORT ?? 3917);
@@ -143,7 +146,77 @@ try {
     );
   }
 
-  writeFileSync(resolve(sortie, `preuve-${NOM}.json`), JSON.stringify({ jours: JOURS, titres, courbes, prevision, sansPrevision, verifs }, null, 2));
+  let activite = null;
+  if (LIRE_ACTIVITE) {
+    // ── Activité : « Nommer ce lieu » sur une recharge dont le lieu est inconnu (CarAI#8) ──
+    const lignesRecharge = () =>
+      page.$$eval("li.ev-recharge", (els) =>
+        els.map((e) => ({
+          ou: (e.querySelector(".ou")?.textContent ?? "").trim(),
+          prix: (e.querySelector(".liens")?.textContent ?? "").replace(/\s+/g, " ").trim(),
+          nommable: Boolean(e.querySelector(".nommer-lieu > summary")),
+        })),
+      );
+    await page.goto(`${ORIGINE}/activite?periode=7j`, { waitUntil: "networkidle" });
+    await page.waitForSelector("li.ev-recharge", { timeout: 30_000 });
+    const avant = await lignesRecharge();
+    await page.screenshot({ path: resolve(sortie, "preuve-activite-avant.png"), fullPage: true });
+    verifie(
+      "avant : des recharges affichent « lieu inconnu » avec le geste « Nommer ce lieu » (CarAI#8)",
+      avant.length > 0 && avant.every((l) => l.ou === "lieu inconnu" && l.nommable),
+      { nb: avant.length, premiere: avant[0] },
+    );
+    verifie(
+      "avant : leur coût est une estimation (« ~ ») (CarAI#8)",
+      avant.every((l) => l.prix.startsWith("~")),
+      avant.map((l) => l.prix),
+    );
+
+    await page.click("li.ev-recharge .nommer-lieu > summary");
+    await page.fill("li.ev-recharge .nommer-lieu input[name=nom]", "Borne d'essai");
+    await page.fill("li.ev-recharge .nommer-lieu input[name=tarif]", "0.15");
+    await page.selectOption("li.ev-recharge .nommer-lieu select[name=mode]", "kwh");
+    await page.click("li.ev-recharge .nommer-lieu button[type=submit]");
+    // Succès : la page se rafraîchit et la ligne porte déjà le nom (le formulaire disparaît avec
+    // « lieu inconnu »). Un refus, lui, resterait affiché dans `.cl-message`.
+    await page.waitForFunction(
+      () => [...document.querySelectorAll("li.ev-recharge .ou")].some((e) => e.textContent?.includes("Borne d'essai")),
+      undefined,
+      { timeout: 30_000 },
+    );
+    const refus = await page.$$eval("li.ev-recharge .nommer-lieu .cl-message.erreur", (els) =>
+      els.map((e) => (e.textContent ?? "").trim()),
+    );
+    verifie("le geste aboutit sans refus : la ligne porte le nom sans recharger la page (CarAI#8)", refus.length === 0, refus);
+
+    await page.goto(`${ORIGINE}/activite?periode=7j`, { waitUntil: "networkidle" });
+    await page.waitForSelector("li.ev-recharge", { timeout: 30_000 });
+    const apres = await lignesRecharge();
+    await page.screenshot({ path: resolve(sortie, "preuve-activite-apres.png"), fullPage: true });
+    verifie(
+      "après : toutes les recharges au même endroit, passées comme récentes, portent le nom (CarAI#8)",
+      apres.length === avant.length && apres.every((l) => l.ou === "Borne d'essai" && !l.nommable),
+      { nb: apres.length, premiere: apres[0] },
+    );
+    verifie(
+      "après : avec un tarif, le coût n'est plus une estimation (« ~ ») (CarAI#8)",
+      apres.every((l) => /\d/.test(l.prix) && !l.prix.startsWith("~")),
+      apres.map((l) => l.prix),
+    );
+
+    await page.goto(`${ORIGINE}/reglages`, { waitUntil: "networkidle" });
+    const lieuxReglages = await page.$$eval(".liste-lieux li", (els) =>
+      els.map((e) => (e.textContent ?? "").replace(/\s+/g, " ").trim()),
+    );
+    verifie(
+      "le lieu rejoint la liste des lieux de Réglages, avec son tarif (CarAI#8)",
+      lieuxReglages.length === 1 && /Borne d'essai/.test(lieuxReglages[0] ?? "") && /0[.,]150 \$\/kWh/.test(lieuxReglages[0] ?? ""),
+      lieuxReglages,
+    );
+    activite = { avant, apres, lieuxReglages };
+  }
+
+  writeFileSync(resolve(sortie, `preuve-${NOM}.json`), JSON.stringify({ jours: JOURS, titres, courbes, prevision, sansPrevision, activite, verifs }, null, 2));
   code = verifs.every((v) => v.ok) ? 0 : 1;
 } catch (e) {
   console.error(`ÉCHEC du contrôle : ${e?.message ?? e}`);

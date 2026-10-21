@@ -137,9 +137,11 @@ export async function LieuxDeRecharge() {
             <li key={l.nom}>
               <span className="lieu-nom">{l.nom}</span>
               <span className="lieu-tarif">
-                {l.mode === "horaire"
-                  ? `${l.tarif.toFixed(2)} $/h`
-                  : `${l.tarif.toFixed(3)} $/kWh`}
+                {l.tarif === undefined
+                  ? "sans tarif"
+                  : l.mode === "horaire"
+                    ? `${l.tarif.toFixed(2)} $/h`
+                    : `${l.tarif.toFixed(3)} $/kWh`}
               </span>
               <span className="meta">rayon {l.rayonM} m</span>
               <form action={retirerLieu}>

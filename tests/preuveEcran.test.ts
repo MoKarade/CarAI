@@ -118,3 +118,17 @@ describe("noms d'étapes des workflows", () => {
     expect(fautives, fautives.map((f) => `ligne ${f.n} : ${f.l.trim()}`).join("\n")).toEqual([]);
   });
 });
+
+describe("relevesFictifs et « Nommer ce lieu » (CarAI#8)", () => {
+  it("la voiture dort la nuit à un point que rien ne nomme, le jour ailleurs, jamais en roulant", () => {
+    const positions = relevesFictifs({ fin: FIN, jours: 6 }).filter((r) => r.metricType === "location");
+    expect(positions.length).toBeGreaterThan(50);
+    const points = new Set(positions.map((p) => JSON.stringify(p.json)));
+    expect(points.size).toBe(2);
+    for (const p of positions) {
+      const h = (new Date(p.t).getUTCHours() - 4 + 24) % 24;
+      expect(h >= 7 && h < 9).toBe(false);
+      expect(h >= 17 && h < 19).toBe(false);
+    }
+  });
+});

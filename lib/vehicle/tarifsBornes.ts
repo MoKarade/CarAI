@@ -29,7 +29,15 @@ export type ModeTarif = "horaire" | "kwh";
 
 export type QualitePrix = "mesure" | "estime" | "inconnu";
 
-/** Un lieu que Marc a nommé et tarifé lui-même. Vit en BASE, jamais dans le dépôt. */
+/**
+ * Un lieu que Marc a nommé, et le plus souvent tarifé, lui-même. Vit en BASE, jamais dans le
+ * dépôt.
+ *
+ * ⚠️ `mode` et `tarif` vont ensemble et sont FACULTATIFS (CarAI#8) : un lieu nommé après coup
+ * depuis Activité porte un nom sans tarif. Il nomme alors ses recharges mais ne les chiffre
+ * pas : `prixSession` le traite comme un lieu inconnu pour le prix. Jamais un tarif par
+ * défaut, qui se lirait comme une mesure.
+ */
 export interface LieuTarife {
   /** Nom court, choisi par Marc (« Boulot », « Maison »). */
   nom: string;
@@ -37,9 +45,17 @@ export interface LieuTarife {
   lng: number;
   /** Rayon d'appariement, en mètres. Un stationnement fait quelques dizaines de mètres. */
   rayonM: number;
-  mode: ModeTarif;
+  mode?: ModeTarif;
   /** $/h en mode horaire, $/kWh en mode kWh. */
-  tarif: number;
+  tarif?: number;
+}
+
+/** Le lieu SI Marc l'a tarifé : le seul cas où il fixe un prix. Sans tarif, `null`. PURE. */
+function lieuAvecTarif(
+  lieu: LieuTarife | null,
+): (LieuTarife & { mode: ModeTarif; tarif: number }) | null {
+  if (!lieu || lieu.mode === undefined || lieu.tarif === undefined) return null;
+  return { ...lieu, mode: lieu.mode, tarif: lieu.tarif };
 }
 
 /**
@@ -223,12 +239,12 @@ export function distanceM(
  * (une borne au travail et une borne publique en face) doivent départager par la distance,
  * sinon l'ordre de saisie déciderait du prix.
  */
-export function lieuDeLaPosition(
+export function lieuDeLaPosition<L extends { lat: number; lng: number; rayonM: number }>(
   position: { lat: number; lng: number } | null,
-  lieux: readonly LieuTarife[],
-): LieuTarife | null {
+  lieux: readonly L[],
+): L | null {
   if (!position) return null;
-  let meilleur: { lieu: LieuTarife; d: number } | null = null;
+  let meilleur: { lieu: L; d: number } | null = null;
   for (const lieu of lieux) {
     const d = distanceM(position, lieu);
     if (d > lieu.rayonM) continue;
@@ -299,9 +315,11 @@ export function prixSession(params: {
     bornesEstimees,
   } = params;
 
-  // 1. UN LIEU CONNU DE MARC — c'est un vrai prix, il gagne sur tout le reste.
-  if (lieu) {
-    if (lieu.mode === "horaire") {
+  // 1. UN LIEU CONNU DE MARC ET TARIFÉ PAR LUI — c'est un vrai prix, il gagne sur tout le reste.
+  //    (Un lieu nommé sans tarif, CarAI#8, ne fixe aucun prix : il retombe sur la suite.)
+  const lieuTarife = lieuAvecTarif(lieu);
+  if (lieuTarife) {
+    if (lieuTarife.mode === "horaire") {
       // ⚠️ UN MAJORANT MULTIPLIÉ PAR UN TARIF NE DONNE PAS UNE MESURE (Marc, 17/09).
       // Une borne horaire facture le temps BRANCHÉ ; quand les bornes de la session sont
       // des fenêtres de sondage, ce temps est un majorant — donc le montant aussi. Le
@@ -310,13 +328,13 @@ export function prixSession(params: {
       // qu'elle a duré, et personne ne pouvait le savoir en lisant l'écran.
       // Le montant RESTE affiché — un trou dans un cumul coûte plus cher qu'un chiffre
       // dont on dit la valeur — mais il dit ce qu'il est : un plafond.
-      const montant = (dureeMinutes / 60) * lieu.tarif;
+      const montant = (dureeMinutes / 60) * lieuTarife.tarif;
       if (bornesEstimees) {
         return {
           montant,
           qualite: "estime",
           explication:
-            `${lieu.nom} — ${lieu.tarif.toFixed(2)} $/h, AU PLUS : la durée ` +
+            `${lieuTarife.nom} — ${lieuTarife.tarif.toFixed(2)} $/h, AU PLUS : la durée ` +
             `(${formaterDuree(dureeMinutes)}) est la fenêtre entre deux relevés, pas un ` +
             `temps de branchement mesuré. Le vrai montant est inférieur ou égal.`,
         };
@@ -324,20 +342,20 @@ export function prixSession(params: {
       return {
         montant,
         qualite: "mesure",
-        explication: `${lieu.nom} — ${lieu.tarif.toFixed(2)} $/h sur ${formaterDuree(dureeMinutes)}`,
+        explication: `${lieuTarife.nom} — ${lieuTarife.tarif.toFixed(2)} $/h sur ${formaterDuree(dureeMinutes)}`,
       };
     }
     if (energieKwh === null) {
       return {
         montant: null,
         qualite: "inconnu",
-        explication: `${lieu.nom} est facturé au kWh, mais l’énergie de cette session n’est pas connue`,
+        explication: `${lieuTarife.nom} est facturé au kWh, mais l’énergie de cette session n’est pas connue`,
       };
     }
     return {
-      montant: energieKwh * lieu.tarif,
+      montant: energieKwh * lieuTarife.tarif,
       qualite: "mesure",
-      explication: `${lieu.nom} — ${lieu.tarif.toFixed(3)} $/kWh sur ${energieKwh.toFixed(1)} kWh`,
+      explication: `${lieuTarife.nom} — ${lieuTarife.tarif.toFixed(3)} $/kWh sur ${energieKwh.toFixed(1)} kWh`,
     };
   }
 
