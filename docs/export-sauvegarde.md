@@ -78,7 +78,8 @@ mémoriser `curseur` — SEULEMENT ici, une fois TOUS les fichiers de la passe d
 | `EXPORT_KEY` | Vercel (CarAI) et coffre de Marc | 32 octets aléatoires en base64. **Sans elle, la sauvegarde est illisible.** DriveAI ne l'a pas. |
 | `EXPORT_TOKEN` | Vercel (CarAI) et Script Properties de DriveAI (nom proposé : `CARAI_EXPORT_TOKEN`) | Au moins 32 caractères aléatoires. La même valeur des deux côtés. |
 
-Marc les pose via le PC (.github#299). Sans les deux, la route répond 503 et rien ne sort.
+Marc les pose via le PC (.github#299). Sans les deux, la route répond 503 et rien ne sort. Elles ne figurent volontairement pas
+dans `.env.example` : le Garde-fou y lit une référence à un secret et attend Marc ; ce fichier est leur seule documentation.
 
 ## Restaurer (essayé une fois sur une base d'essai)
 
