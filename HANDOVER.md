@@ -2,7 +2,17 @@
 
 > À lire en premier à chaque reprise de session.
 
-**Dernière mise à jour** : 2026-10-16 · branche `claude/retirer-termes-bail`
+**Dernière mise à jour** : 2026-10-21 · branche `claude/depassement-en-dollars`
+
+## 21/10 — Le dépassement du forfait s'affiche en dollars (CarAI#7)
+
+Marc a saisi le coût du km excédentaire dans Réglages (jamais écrit hors de la base). `libelleDepassementProjete`
+(`lib/vehicle/lease.ts`, pure, testée par `tests/depassementEnDollars.test.ts` avec un tarif FICTIF) donne « Dépassement
+projeté : x km, ~ y $ (estimation) » seulement quand le tarif est connu ET qu'un dépassement est projeté ; sinon `null`, et
+l'écran ne change pas (la limite « tarif inconnu » reste, jamais de « 0 $ » pour un coût inconnu). Elle alimente une pastille du
+bandeau du bail de l'accueil (`BandeauBail`, `app/page.tsx`) et l'outil MCP `bail` (`lib/mcp/outils.ts` : `depassementProjeteKm`,
+`coutDepassementProjete`, `devise`, `coutDepassement`, ajoutés seulement dans ce cas). Preuve du tarif en production sans lire
+sa valeur : `bail` annonçait un dépassement projeté avec `limites` vide, donc la branche « tarif connu » de `calculerEtatBail`.
 
 ## 16/10 — Les termes du bail ne sont plus dans le code (CarAI#239)
 
