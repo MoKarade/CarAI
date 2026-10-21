@@ -6,6 +6,7 @@
 // raisons. Ce test relie donc la base fictive au calcul RÉEL de consommation.
 
 import { describe, expect, it } from "vitest";
+import { readdirSync, readFileSync } from "node:fs";
 import { relevesFictifs } from "../scripts/preuve-ecran/base-fictive.mjs";
 import { calculerConsommation, serieConsommation } from "@/lib/vehicle/consommation";
 import { previsionFinDeMois } from "@/lib/vehicle/prevision";
@@ -91,5 +92,29 @@ describe("relevesFictifs et la prévision de fin de mois", () => {
     const p = prevoir(6);
     expect(p.disponible).toBe(false);
     if (!p.disponible) expect(p.raison).toMatch(/au moins 14/);
+  });
+});
+
+// Un workflow dont le YAML ne se lit pas ne REFUSE rien de bruyant : GitHub l'enregistre sous son
+// chemin, le lance en 0 seconde et le marque « échec » sans journal. C'est arrivé avec « Preuve
+// des écrans » (un « : » dans un nom d'étape non guillemeté), et comme ce workflow ne tourne
+// qu'après la fusion, la PR était verte. Aucun analyseur YAML n'est une dépendance du dépôt : on
+// verrouille précisément cette classe d'erreur, un nom d'étape non guillemeté ne contient ni
+// « : » ni « #... ».
+describe("noms d'étapes des workflows", () => {
+  const dossier = ".github/workflows";
+  const fichiers = readdirSync(dossier).filter((f) => f.endsWith(".yml"));
+
+  it("il y a des workflows à vérifier (anti-vacuité)", () => {
+    expect(fichiers.length).toBeGreaterThan(3);
+  });
+
+  it.each(fichiers)("%s : aucun nom d'étape non guillemeté ne contient « : »", (fichier) => {
+    const lignes = readFileSync(`${dossier}/${fichier}`, "utf8").split(/\r?\n/);
+    const fautives = lignes
+      .map((l, i) => ({ l, n: i + 1 }))
+      .filter(({ l }) => /^\s*(?:-\s+)?name:\s+(?!["'|>])(.+)$/.test(l))
+      .filter(({ l }) => /:\s|\s#/.test(l.replace(/^\s*(?:-\s+)?name:\s+/, "")));
+    expect(fautives, fautives.map((f) => `ligne ${f.n} : ${f.l.trim()}`).join("\n")).toEqual([]);
   });
 });
