@@ -22,6 +22,14 @@ const CAPACITE_KWH = 71.4;
 const KM_PAR_DEMI_HEURE = 20;
 const KWH_PAR_100_KM = 17;
 
+/**
+ * Deux lieux de stationnement FICTIFS (CarAI#8) : la nuit, la voiture dort à une « borne » que
+ * rien ne nomme encore (Activité écrit « lieu inconnu », d'où le geste « Nommer ce lieu ») ; le
+ * jour, elle est ailleurs. Points de la liste blanche de `tests/donneesPerso.test.ts`.
+ */
+const POINT_NUIT = { latitude: 48.35, longitude: -77.77 };
+const POINT_JOUR = { latitude: 47.7, longitude: -77.4 };
+
 /** Facteur de rythme du bloc de 7 jours (0 = le plus récent) auquel appartient l'instant `t`. */
 const FACTEURS_SEMAINE = [1, 0.7, 1.3];
 
@@ -56,6 +64,11 @@ export function relevesFictifs({ fin = new Date(), jours = 6 } = {}) {
     ajoute(date, "odometer", km, "km");
     ajoute(date, "battery_range", Math.round(soc * 4.2), "km");
     ajoute(date, "outside_temperature", Math.round((6 + 5 * Math.sin(t / 5_400_000)) * 10) / 10, "°C");
+    // Garée la nuit au point de recharge, le jour ailleurs ; aucune position en roulant.
+    if (!enRoute) {
+      const point = h >= 19 || h < 7 ? POINT_NUIT : POINT_JOUR;
+      ajoute(date, "location", null, null, { json: point, locationType: "LAST_PARKED" });
+    }
   }
 
   ajoute(new Date(fin.getTime() - 60_000), "battery_capacity_nominal", null, null, {
@@ -68,9 +81,17 @@ async function remplir(client, lignes) {
   for (const l of lignes) {
     await client.query(
       `INSERT INTO vehicle_snapshots
-         (recorded_at, received_at, source, metric_type, signal_code, signal_status, value_numeric, value_json, unit)
-       VALUES ($1, $1, 'smartcar', $2, $3, 'SUCCESS', $4, $5::jsonb, $6)`,
-      [l.t.toISOString(), l.metricType, `essai-${l.metricType}`, l.valeur, l.json ? JSON.stringify(l.json) : null, l.unite],
+         (recorded_at, received_at, source, metric_type, signal_code, signal_status, value_numeric, value_json, unit, location_type)
+       VALUES ($1, $1, 'smartcar', $2, $3, 'SUCCESS', $4, $5::jsonb, $6, $7)`,
+      [
+        l.t.toISOString(),
+        l.metricType,
+        `essai-${l.metricType}`,
+        l.valeur,
+        l.json ? JSON.stringify(l.json) : null,
+        l.unite,
+        l.locationType ?? null,
+      ],
     );
   }
 }
