@@ -35,3 +35,4 @@
 - [Documentation (où vit quoi)](claude/08-documentation.md) — `docs/claude/08-documentation.md`
 - [Style et compte-rendu](claude/10-style-compte-rendu.md) — `docs/claude/10-style-compte-rendu.md`
 - [Ce qui n'a pas pu être vérifié (et où ça en est)](claude/11-ce-qui-na-pas-pu-etre-verifie.md) — `docs/claude/11-ce-qui-na-pas-pu-etre-verifie.md`
+- [12 — Graphe de code local (graphifyy) : hooks, wiki et MCP](claude/12-graphe-code.md) — `docs/claude/12-graphe-code.md`
