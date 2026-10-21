@@ -18,6 +18,14 @@ import type { PointOdometre } from "@/lib/vehicle/lease";
  * qu'il regarde justement à cette heure-là — serait toujours faux (leçon JobAI).
  */
 export function debutDuJourLocal(maintenant: Date, fuseau = "America/Toronto"): Date {
+  const jourIso = new Intl.DateTimeFormat("en-CA", {
+    timeZone: fuseau,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(maintenant);
+
+  const targetUtcMs = new Date(`${jourIso}T00:00:00.000Z`).getTime();
   const format = new Intl.DateTimeFormat("en-CA", {
     timeZone: fuseau,
     year: "numeric",
@@ -25,15 +33,28 @@ export function debutDuJourLocal(maintenant: Date, fuseau = "America/Toronto"): 
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+    second: "2-digit",
     hour12: false,
   });
-  const parties = Object.fromEntries(
-    format.formatToParts(maintenant).map((p) => [p.type, p.value]),
-  );
-  const heures = Number(parties.hour === "24" ? "0" : parties.hour);
-  const minutes = Number(parties.minute);
-  // On retranche l'heure locale écoulée : le résultat est minuit local, exprimé en UTC.
-  return new Date(maintenant.getTime() - (heures * 60 + minutes) * 60_000);
+
+  const getLocalAsUtcMs = (utcDate: Date) => {
+    const parts = Object.fromEntries(
+      format.formatToParts(utcDate).map((p) => [p.type, p.value]),
+    );
+    const hour = parts.hour === "24" ? "00" : parts.hour;
+    return new Date(
+      `${parts.year}-${parts.month}-${parts.day}T${hour}:${parts.minute}:${parts.second}.000Z`,
+    ).getTime();
+  };
+
+  const candidate = new Date(`${jourIso}T00:00:00.000Z`);
+  const offset = getLocalAsUtcMs(candidate) - candidate.getTime();
+  let utcResult = new Date(targetUtcMs - offset);
+  const offset2 = getLocalAsUtcMs(utcResult) - utcResult.getTime();
+  if (offset2 !== offset) {
+    utcResult = new Date(targetUtcMs - offset2);
+  }
+  return utcResult;
 }
 
 /** Début du MOIS local, en UTC. Même raison que ci-dessus. */

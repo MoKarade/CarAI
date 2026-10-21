@@ -30,6 +30,13 @@ describe("minuitLocal", () => {
     expect(minuitLocal("2026-01-13")!.toISOString()).toBe("2026-01-13T05:00:00.000Z");
   });
 
+  it("donne le minuit local exact le jour d'un changement d'heure", () => {
+    // 1er novembre 2026 (passage EDT -> EST) : minuit local est à 00 h 00 EDT (04 h 00 UTC).
+    expect(minuitLocal("2026-11-01")!.toISOString()).toBe("2026-11-01T04:00:00.000Z");
+    // 8 mars 2026 (passage EST -> EDT) : minuit local est à 00 h 00 EST (05 h 00 UTC).
+    expect(minuitLocal("2026-03-08")!.toISOString()).toBe("2026-03-08T05:00:00.000Z");
+  });
+
   it("refuse une date qui n'existe pas plutôt que de la décaler en silence", () => {
     expect(minuitLocal("2026-02-31")).toBeNull();
     expect(minuitLocal("2026-13-01")).toBeNull();
@@ -76,6 +83,12 @@ describe("analyserFenetre", () => {
     expect(f.depuis!.toISOString()).toBe("2026-08-13T04:00:00.000Z");
     expect(f.jusqu!.toISOString()).toBe("2026-08-14T04:00:00.000Z");
     expect(f.libelle).toBe("Le 2026-08-13");
+  });
+
+  it("la plage d'un jour le 1er novembre commence bien à minuit local", () => {
+    const f = analyserFenetre({ du: "2026-11-01", au: "2026-11-01" }, MAINTENANT);
+    expect(f.mode).toBe("jour");
+    expect(f.depuis!.toISOString()).toBe("2026-11-01T04:00:00.000Z");
   });
 
   it("comprend une PLAGE", () => {
