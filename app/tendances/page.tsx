@@ -873,9 +873,18 @@ export default async function Tendances({
         <p className="lead">Aucune donnée en base pour l’instant — rien à analyser.</p>
       ) : (
         <>
-          {/* Par deux sur PC (`.colonnes-pc`, globals.css) : l'état et la consommation, puis
-              les déductions et le bail. Un membre absent laisse l'autre pleine largeur. */}
+          {/* Par deux sur PC (`.colonnes-pc`, globals.css) : la consommation et l'état, puis
+              les déductions et le bail. Un membre absent laisse l'autre pleine largeur.
+
+              CarAI#30 (Marc, 19/10) : la CONSOMMATION ouvre l'écran, avant l'état du véhicule. */}
           <div className="colonnes-pc">
+            {conso && (
+              <section>
+                <h2>Consommation réelle</h2>
+                <ConsommationReelle conso={conso} />
+              </section>
+            )}
+
             {schema && (
               <section>
                 <h2>Le véhicule maintenant</h2>
@@ -885,13 +894,6 @@ export default async function Tendances({
                   autonomieKm={autonomieKm}
                   odometreKm={odometreKm}
                 />
-              </section>
-            )}
-
-            {conso && (
-              <section>
-                <h2>Consommation réelle</h2>
-                <ConsommationReelle conso={conso} />
               </section>
             )}
           </div>
