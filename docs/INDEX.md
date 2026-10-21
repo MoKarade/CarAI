@@ -2,7 +2,7 @@
 
 <!-- GÉNÉRÉ par `node .github/ci/generer-index.mjs` : ne pas modifier à la main (`--verifier` échoue si ce fichier est périmé). -->
 
-23 document(s). Ancien titre -> nouveau chemin : [correspondance.md](correspondance.md).
+24 document(s). Ancien titre -> nouveau chemin : [correspondance.md](correspondance.md).
 
 ## docs/
 
@@ -14,6 +14,7 @@
 - [Référence API Smartcar — capturée le 2026-08-14](SMARTCAR_API.md) — `docs/SMARTCAR_API.md`
 - [Correspondance des anciens titres](correspondance.md) — `docs/correspondance.md`
 - [Coûts — CarAI](couts.md) — `docs/couts.md`
+- [Sauvegarde externe de la base — interface CarAI ↔ DriveAI (CarAI#13)](export-sauvegarde.md) — `docs/export-sauvegarde.md`
 - [Rattachement de CarAI à l'Atelier](rattachement.md) — `docs/rattachement.md`
 
 ## docs/adr/
