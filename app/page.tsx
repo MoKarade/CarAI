@@ -31,6 +31,7 @@ import {
   MESSAGE_BAIL_NON_RENSEIGNE,
   avanceSurLeBail,
   calculerEtatBail,
+  libelleDepassementProjete,
   resumerBail,
 } from "@/lib/vehicle/lease";
 import {
@@ -589,6 +590,9 @@ function BandeauBail({
   // signaux distincts, deux peintures distinctes — les fondre en dirait un pour l'autre.
   const avance = avanceSurLeBail(bail);
   const part = avance === null ? null : avance.consommePourcent / 100;
+  // [BAIL-01] Le dépassement en DOLLARS, seulement quand le tarif est connu et qu'un dépassement
+  // est projeté ; sinon rien de neuf à l'écran (jamais « 0 $ » pour un coût inconnu).
+  const libelleCout = libelleDepassementProjete(bail);
 
   return (
     <section className="bandeau-bail" aria-label="Bail">
@@ -623,6 +627,7 @@ function BandeauBail({
           <Pastille ton="neutre">
             {bail.joursRestants.toLocaleString("fr-CA")} jours restants
           </Pastille>
+          {libelleCout !== null && <Pastille ton="attention">{libelleCout}</Pastille>}
           {avance !== null && (
             // Les DEUX chiffres, toujours : « 6,8 % du forfait » est excellent au bout d'un
             // an et catastrophique au bout d'un mois. Le second n'est pas un détail, c'est

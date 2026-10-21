@@ -297,6 +297,36 @@ export function resumerBail(etat: EtatBail): string {
   return `${km} km sur ${total} autorisés — marge projetée de ${marge} km à ce rythme.`;
 }
 
+/**
+ * Le dépassement projeté en kilomètres ET en dollars, pour l'accueil et le MCP. PURE.
+ *
+ * `null` tant que le coût n'est pas chiffré : tarif absent (la limite « tarif inconnu » le dit
+ * déjà), aucun dépassement projeté, ou rythme pas encore mesurable. On ne montre JAMAIS un
+ * « 0 $ » à la place d'un coût inconnu. Le montant vient d'une projection : il est dit
+ * « estimation », comme les autres chiffres de ce module qui ne sont pas des mesures.
+ */
+export function libelleDepassementProjete(
+  etat: Pick<EtatBail, "depassementProjete" | "coutDepassementProjete" | "devise">,
+): string | null {
+  if (etat.depassementProjete === null || etat.depassementProjete <= 0) return null;
+  if (etat.coutDepassementProjete === null) return null;
+  const km = Math.round(etat.depassementProjete).toLocaleString("fr-CA");
+  return `Dépassement projeté : ${km} km, ~ ${formaterMontant(etat.coutDepassementProjete, etat.devise)} (estimation)`;
+}
+
+/** Un montant arrondi au dollar ; un code de devise que `Intl` refuse reste lisible. */
+function formaterMontant(montant: number, devise: string): string {
+  try {
+    return montant.toLocaleString("fr-CA", {
+      style: "currency",
+      currency: devise,
+      maximumFractionDigits: 0,
+    });
+  } catch {
+    return `${Math.round(montant).toLocaleString("fr-CA")} ${devise}`;
+  }
+}
+
 // ══ L'AVANCE SUR LE FORFAIT ══════════════════════════════════════════════════════════
 //
 // `consommePourcent` seul ne dit RIEN. « 6,8 % du forfait » est excellent au bout d'un an
