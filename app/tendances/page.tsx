@@ -57,7 +57,11 @@ import {
 } from "@/lib/vehicle/analyse";
 import { libellePosition } from "@/lib/vehicle/schemaVehicule";
 import { lireBail } from "@/lib/config";
-import { calculerConsommation, type Consommation } from "@/lib/vehicle/consommation";
+import {
+  calculerConsommation,
+  serieConsommation,
+  type Consommation,
+} from "@/lib/vehicle/consommation";
 import { lireEtatVehicule, type MesureQualifiee } from "@/lib/vehicle/state";
 import { historiqueOdometre } from "@/lib/vehicle/history";
 import { MESSAGE_BAIL_NON_RENSEIGNE, calculerEtatBail, resumerBail } from "@/lib/vehicle/lease";
@@ -85,7 +89,7 @@ import {
   formatDate,
   formatDateHeure,
 } from "@/app/ui/Graphique";
-import { GraphiquesLies } from "@/app/ui/GraphiquesLies";
+import { GraphiquesLies, type SerieGraphique } from "@/app/ui/GraphiquesLies";
 import { SchemaVehicule } from "@/app/ui/SchemaVehicule";
 import { construireEtatSchema, type EtatSchema } from "@/lib/vehicle/etatSchema";
 import {
@@ -144,6 +148,10 @@ const EXPLICATIONS: Readonly<Record<string, string>> = {
   charge_time_remaining:
     "Temps de charge restant annoncé par la voiture. ⚠️ La bZ ne le remet PAS à zéro en fin de session : entre deux charges, la courbe reste figée sur la dernière valeur annoncée — ce n’est pas un compte à rebours qui tourne.",
 };
+
+/** La phrase de la courbe de consommation : ce qu'elle est, et ce qu'elle n'est pas. */
+const EXPLICATION_CONSOMMATION =
+  "Un point par trajet retenu, à sa date de fin. C’est une estimation : la capacité de la batterie vient de la configuration, et la veille de la voiture est comptée dans le trajet.";
 
 function Coquille({ titre, children }: { titre: string; children: React.ReactNode }) {
   return (
@@ -865,6 +873,37 @@ export default async function Tendances({
   const rienDuTout = nbMetriques === 0;
   const cleGoogle = cleMapsEmbed();
 
+  // ── LA COURBE DE CONSOMMATION OUVRE LES COURBES LIÉES (CarAI#41) ───────────────────
+  // Dérivée des segments déjà retenus par `calculerConsommation` : aucune mesure ni calcul
+  // de plus. Elle partage l'axe de temps et le zoom des autres (Marc, 14/08 : « une échelle
+  // identique, même quand je zoome »), d'où sa place DANS ce composant : les pneus restent
+  // au-dessus sur leur axe unique, voir plus bas.
+  const seriesConso = conso ? serieConsommation(conso) : [];
+  const seriesLiees: SerieGraphique[] = [
+    ...(seriesConso.length > 0
+      ? [
+          {
+            id: "consommation",
+            titre: "Consommation (estimation)",
+            points: seriesConso,
+            unite: "kWh/100 km",
+            decimales: 1,
+            teinte: 0,
+            explication: EXPLICATION_CONSOMMATION,
+          },
+        ]
+      : []),
+    ...courbes.map((c, i) => ({
+      id: c.metricType,
+      titre: libelle(c.metricType),
+      points: c.points,
+      unite: c.unite,
+      decimales: c.decimales,
+      teinte: (i + (seriesConso.length > 0 ? 1 : 0)) % 6,
+      explication: EXPLICATIONS[c.metricType],
+    })),
+  ];
+
   return (
     <Coquille titre="Tendances">
       <BoutonRafraichir />
@@ -957,19 +996,18 @@ export default async function Tendances({
               passer ici leur donnerait un axe par roue — exactement le défaut que la refonte
               du 13/08 a corrigé : deux pressions écartées de 35 kPa s'y dessinaient
               identiques, et l'écart est la seule chose qui compte sur des pneus. */}
-          {courbes.length > 0 && (
-            <GraphiquesLies
-              series={courbes.map((c, i) => ({
-                id: c.metricType,
-                titre: libelle(c.metricType),
-                points: c.points,
-                unite: c.unite,
-                decimales: c.decimales,
-                teinte: i % 6,
-                explication: EXPLICATIONS[c.metricType],
-              }))}
-            />
+          {conso && seriesConso.length === 0 && (
+            <p className="hint">
+              Pas de courbe de consommation sur cette période : aucun segment de roulage
+              exploitable
+              {conso.nbEcartes > 0
+                ? ` (${conso.nbEcartes} écarté(s) : voiture surtout à l’arrêt)`
+                : ""}
+              . Rien n’est tracé plutôt qu’une courbe inventée.
+            </p>
           )}
+
+          {seriesLiees.length > 0 && <GraphiquesLies series={seriesLiees} />}
 
           {/* Le relevé détaillé reste disponible sous les courbes, une entrée par métrique.
               Il répond à « quelle valeur exactement, et quand » — le survol d'une courbe le

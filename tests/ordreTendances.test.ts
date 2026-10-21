@@ -48,4 +48,24 @@ describe("ordre des blocs de /tendances", () => {
     expect(carte).toBeGreaterThan(place("<GraphiqueMulti"));
     expect(carte).toBeGreaterThan(place("<h2>Évolution</h2>"));
   });
+
+  // CarAI#41 : la courbe de consommation OUVRE la liste des courbes liées (axe et zoom
+  // partagés avec les autres, règle du 14/08). Les pneus restent au-dessus, sur leur axe
+  // unique : ce n'est pas elle qu'on déplace.
+  it("la courbe de consommation vient avant les autres courbes liées", () => {
+    const conso = source.indexOf('id: "consommation"');
+    const autres = source.indexOf("...courbes.map((c, i) => ({");
+    expect(conso, "la série « consommation » a disparu de la page").toBeGreaterThan(-1);
+    expect(autres, "les autres courbes ont disparu de la liste liée").toBeGreaterThan(-1);
+    expect(conso).toBeLessThan(autres);
+  });
+
+  it("les courbes liées sont rendues depuis cette liste, en un seul composant", () => {
+    expect(rendu.match(/<GraphiquesLies/g)).toHaveLength(1);
+    expect(place("<GraphiquesLies series={seriesLiees} />")).toBeGreaterThan(-1);
+  });
+
+  it("sans segment retenu, une ligne dit pourquoi au lieu d'une courbe inventée", () => {
+    expect(rendu).toContain("Pas de courbe de consommation sur cette période");
+  });
 });
