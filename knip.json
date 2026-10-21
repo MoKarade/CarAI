@@ -1,6 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignore": [".github/ci/**", "scripts/hooks/**"],
+  "ignore": [".github/ci/**", "scripts/hooks/**", "scripts/preuve-ecran/precharge.cjs"],
   "ignoreDependencies": [
     "eslint-config-next"
   ]

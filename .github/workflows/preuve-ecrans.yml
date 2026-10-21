@@ -1,0 +1,61 @@
+name: Preuve des écrans
+
+# CarAI#44 : lit les écrans de l'app CONSTRUITE depuis le commit testé, avec une session
+# d'essai et des données fictives (scripts/preuve-ecran/). Une tâche d'écran se prouve ici, sans
+# jamais toucher à la session de Marc ni à la production authentifiée.
+#
+# Lancé après chaque fusion sur main (le commit fusionné est celui qu'on prouve) et à la main.
+# Jamais requis par une PR : pas de `pull_request`, donc aucun check requis absent.
+# Public seulement : sur le robot du PC (dépôt privé), Chromium ne s'installe pas comme ici.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: preuve-ecrans-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  tendances:
+    # Plafond : sans lui, un job figé tourne six heures. Build + lancement : quelques minutes.
+    timeout-minutes: 20
+    name: Lire /tendances avec une session d'essai
+    if: github.event.repository.visibility == 'public'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Dépendances
+        run: npm ci --ignore-scripts
+
+      - name: Construire l'app
+        run: npm run build
+
+      # Playwright hors lockfile : il ne sert qu'à ce contrôle, pas à l'app.
+      - name: Installer Playwright et Chromium
+        run: |
+          npm install --no-save --ignore-scripts playwright@1.56.1
+          npx playwright install --with-deps chromium
+
+      - name: Lire l'écran avec la session d'essai
+        run: npm run preuve:ecran -- preuve-ecran
+
+      - name: Joindre la capture et ce qui a été lu
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: preuve-ecran
+          path: preuve-ecran/
+          if-no-files-found: warn
+          retention-days: 30
