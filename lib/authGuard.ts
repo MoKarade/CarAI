@@ -86,6 +86,12 @@ export const ROUTES_A_AUTH_PROPRE = [
   "/.well-known/oauth-authorization-server",
   "/.well-known/oauth-protected-resource",
   /**
+   * Sauvegarde externe chiffrée (CarAI#13) — jeton `x-export-token` (`EXPORT_TOKEN`), comparé
+   * en temps constant ; sans `EXPORT_TOKEN` ni `EXPORT_KEY`, 503. Lue par DriveAI, qui n'a pas
+   * de session Google de Marc. Ne rend QUE des fichiers chiffrés (`lib/export/sauvegarde.ts`).
+   */
+  "/api/export/sauvegarde",
+  /**
    * Santé publique (#204, vigie de l'Atelier) — SANS authentification, délibérément : elle
    * ne rend que `{"ok": true|false}`, jamais une donnée du véhicule ni un message d'erreur
    * brut. Derrière le garde de session, la vigie recevrait une redirection HTML au lieu du

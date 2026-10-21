@@ -2,7 +2,19 @@
 
 > À lire en premier à chaque reprise de session.
 
-**Dernière mise à jour** : 2026-10-21 · branche `claude/tendances-consommation-en-haut`
+**Dernière mise à jour** : 2026-10-21 · branche `claude/export-sauvegarde`
+
+## 21/10 — Sauvegarde externe chiffrée, voie B (CarAI#13)
+
+Choix de Marc (21/10) : DriveAI dépose l'export dans le dossier Drive dédié ; CarAI ne parle jamais à Google. CarAI SERT des
+lots chiffrés : `GET /api/export/sauvegarde[?apres=<curseur>]`, en-tête `x-export-token` (`EXPORT_TOKEN`), 503 sans
+`EXPORT_TOKEN` ou sans `EXPORT_KEY`, route hors du proxy d'auth énumérée à l'égalité stricte (`authGuard.ts`, `middleware.ts`).
+Un lot = NDJSON → gzip → AES-256-GCM (`lib/export/sauvegarde.ts`, 10 000 rangées ou 4 Mo de clair au plus), curseur par table pour
+l'incrémental, `app_config` en entier dans le dernier lot. Interface complète pour DriveAI : `docs/export-sauvegarde.md`.
+Restauration : `scripts/restaurer-sauvegarde.mjs` (cible `RESTAURATION_DATABASE_URL`, jamais `DATABASE_URL`, base vide exigée,
+tout déchiffré avant la première écriture). `tests/exportSauvegarde.test.ts` rejoue export → restauration contre un vrai Postgres
+et compare table par table. ⚠️ NON FAIT, et c'est ce qui garde #13 ouverte : la clé et le jeton (Marc, via le PC,
+.github#299), le premier export réel déposé par DriveAI, et la restauration essayée sur une base d'essai à partir de CE fichier.
 
 ## 21/10 — Les écrans se prouvent par navigateur, sans la session de Marc (CarAI#44)
 
