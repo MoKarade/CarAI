@@ -4,6 +4,14 @@
 
 **Dernière mise à jour** : 2026-10-21 · branche `claude/tendances-consommation-en-haut`
 
+## 21/10 — Une courbe de consommation ouvre « Évolution » (CarAI#41)
+
+« Consommation (estimation) » est la première série des courbes liées de `/tendances` : un point par segment retenu
+par `calculerConsommation` (nouveau champ `segments`), à sa date de fin, en kWh/100 km (`serieConsommation`, pure).
+Elle partage l'axe et le zoom des autres courbes (règle du 14/08), donc elle est DANS `GraphiquesLies` ; les pneus
+restent au-dessus sur leur axe unique. Fenêtre sans segment retenu : pas de courbe, une ligne le dit. Verrous :
+`tests/serieConsommation.test.ts`, `tests/ordreTendances.test.ts`.
+
 ## 21/10 — Tendances s'ouvre sur la consommation (CarAI#30)
 
 Choix de Marc (19/10) : « Consommation réelle » est le premier bloc de `/tendances`, avant « Le véhicule maintenant » ;

@@ -44,6 +44,8 @@ export interface Consommation {
   nbEcartes: number;
   /** Autonomie que cette consommation implique sur une batterie pleine, en km. */
   autonomieTheoriqueKm: number | null;
+  /** Les segments RETENUS, dans l'ordre du temps : de quoi tracer la courbe (CarAI#41). */
+  segments: SegmentConso[];
 }
 
 /**
@@ -118,6 +120,7 @@ export function calculerConsommation(params: {
     nbSegments: 0,
     nbEcartes: 0,
     autonomieTheoriqueKm: null,
+    segments: [],
   };
 
   if (!capaciteKwh || capaciteKwh <= 0) return vide;
@@ -129,6 +132,7 @@ export function calculerConsommation(params: {
   let kwhTotal = 0;
   let nbSegments = 0;
   let nbEcartes = 0;
+  const segments: SegmentConso[] = [];
 
   for (let i = 1; i < points.length; i += 1) {
     const a = points[i - 1]!;
@@ -150,9 +154,18 @@ export function calculerConsommation(params: {
       continue;
     }
 
+    const kwh = (socConsomme / 100) * capaciteKwh;
     kmTotal += km;
-    kwhTotal += (socConsomme / 100) * capaciteKwh;
+    kwhTotal += kwh;
     nbSegments += 1;
+    segments.push({
+      debut: a.t,
+      fin: b.t,
+      km,
+      socConsomme,
+      kwh,
+      kwhPar100km: (kwh / km) * 100,
+    });
   }
 
   if (kmTotal <= 0 || kwhTotal <= 0) return { ...vide, nbEcartes };
@@ -168,5 +181,18 @@ export function calculerConsommation(params: {
     // Ce que cette consommation donne sur une batterie pleine — le chiffre à comparer à
     // l'autonomie que la voiture affiche.
     autonomieTheoriqueKm: (capaciteKwh / kwhPar100km) * 100,
+    segments,
   };
+}
+
+/**
+ * La courbe de consommation : un point par segment retenu, à sa date de FIN, en kWh/100 km.
+ * PURE, testée. Rien n'est lissé ni interpolé : un segment écarté (voiture à l'arrêt) ne
+ * laisse pas de point, et une fenêtre sans segment donne une série VIDE — jamais une courbe
+ * plate qui aurait l'air d'une mesure.
+ */
+export function serieConsommation(conso: Pick<Consommation, "segments">): Array<{ t: Date; valeur: number }> {
+  return conso.segments
+    .map((s) => ({ t: s.fin, valeur: s.kwhPar100km }))
+    .sort((x, y) => x.t.getTime() - y.t.getTime());
 }
