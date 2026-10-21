@@ -73,6 +73,8 @@ import { GraphiqueMulti } from "@/app/ui/Graphique";
 import { estVrai } from "@/lib/vehicle/alertes";
 import { lireEtatVehicule, mesuresPour } from "@/lib/vehicle/state";
 import { lireBail, lireLieux, type Lieu } from "@/lib/config";
+import { nommerLieuRecharge } from "@/app/activite/actions";
+import { FormulaireNommerLieu } from "@/app/activite/FormulaireNommerLieu";
 import { cleGeo, cleGeocodage, nommerPoints } from "@/lib/geocodage";
 import { CarteInteractive } from "@/app/ui/CarteInteractive";
 import { CarteGoogleItineraire, cleMapsEmbed } from "@/app/ui/CarteGoogle";
@@ -297,10 +299,13 @@ function LigneRecharge({
   session,
   prix,
   nomLieu,
+  position,
 }: {
   session: SessionCharge;
   prix: PrixSession;
   nomLieu: string | null;
+  /** Où la voiture était pendant la recharge : de quoi nommer le lieu d'un geste (CarAI#8). */
+  position: { lat: number; lng: number } | null;
 }) {
   return (
     <li className="evenement ev-recharge">
@@ -341,6 +346,9 @@ function LigneRecharge({
           </span>
         )}
       </span>
+      {nomLieu === null && position !== null && (
+        <FormulaireNommerLieu position={position} nommer={nommerLieuRecharge} />
+      )}
     </li>
   );
 }
@@ -349,6 +357,7 @@ function Journee({
   jour,
   prixParSession,
   lieuxParSession,
+  positionsParSession,
   selection,
   paramsFenetre,
   adresses,
@@ -358,6 +367,7 @@ function Journee({
   jour: JourFil;
   prixParSession: Map<SessionCharge, PrixSession>;
   lieuxParSession: Map<SessionCharge, string | null>;
+  positionsParSession: Map<SessionCharge, { lat: number; lng: number } | null>;
   selection: string | null;
   paramsFenetre: string;
   adresses: Map<string, string>;
@@ -400,6 +410,7 @@ function Journee({
                 }
               }
               nomLieu={lieuxParSession.get(e.session) ?? null}
+              position={positionsParSession.get(e.session) ?? null}
             />
           ),
         )}
@@ -536,6 +547,7 @@ export default async function Activite({
   let nbSessionsLues = 0;
   const prixParSession = new Map<SessionCharge, PrixSession>();
   const lieuxParSession = new Map<SessionCharge, string | null>();
+  const positionsParSession = new Map<SessionCharge, { lat: number; lng: number } | null>();
   let totauxFenetre: { mesure: number; estime: number; nbInconnus: number } = {
     mesure: 0,
     estime: 0,
@@ -638,8 +650,10 @@ export default async function Activite({
 
     // Prix et lieu par session — calculés UNE fois, servis au fil ET aux tuiles.
     for (const s of sessionsToutes) {
-      const lieu = lieuDeLaPosition(positionPendant(s, positions), lieux);
+      const position = positionPendant(s, positions);
+      const lieu = lieuDeLaPosition(position, lieux);
       lieuxParSession.set(s, lieu?.nom ?? null);
+      positionsParSession.set(s, position);
       prixParSession.set(
         s,
         prixSession({
@@ -1208,6 +1222,7 @@ export default async function Activite({
                 jour={j}
                 prixParSession={prixParSession}
                 lieuxParSession={lieuxParSession}
+                positionsParSession={positionsParSession}
                 selection={selection}
                 paramsFenetre={paramsFenetre}
                 adresses={adresses}

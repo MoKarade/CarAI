@@ -3742,6 +3742,29 @@ img.carte-google {
 .ev-recharge {
   border-left: 3px solid var(--succes-texte);
 }
+/* « Nommer ce lieu » (CarAI#8) : une ligne à part, sous la recharge, sur toute la largeur.
+   Sans `grid-area` nommée, la grille la place d'elle-même dans une troisième rangée. */
+.nommer-lieu {
+  grid-column: 1 / -1;
+  margin-top: 0.25rem;
+}
+.nommer-lieu > summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px; /* cible tactile */
+  cursor: pointer;
+  color: var(--texte-doux);
+  font-size: 0.85rem;
+}
+.nommer-lieu .form-lieu {
+  padding-bottom: 0.5rem;
+}
+.nommer-lieu .form-lieu input,
+.nommer-lieu .form-lieu select,
+.nommer-lieu .form-lieu button {
+  min-height: 44px;
+  font-size: 1rem; /* 16 px : en dessous, iOS zoome sur le champ */
+}
 .ev-recharge .ico-recharge {
   color: var(--succes-texte);
   margin-right: 0.3rem;

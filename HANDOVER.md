@@ -2,7 +2,21 @@
 
 > À lire en premier à chaque reprise de session.
 
-**Dernière mise à jour** : 2026-10-21 · branche `claude/export-sauvegarde`
+**Dernière mise à jour** : 2026-10-21 · branche `claude/nommer-lieu-recharge`
+
+## 21/10 — « Nommer ce lieu » sur une recharge au lieu inconnu (CarAI#8)
+
+Sur chaque ligne de recharge « lieu inconnu » d'Activité (quand la position pendant la recharge est connue), un `<details>`
+« Nommer ce lieu » ouvre un formulaire (nom, tarif facultatif, facturation) : `app/activite/FormulaireNommerLieu.tsx`, action
+`app/activite/actions.ts` (`requireSession()` revérifiée), règle pure `lib/vehicle/nommerLieu.ts` (`ajouterLieuNomme`). Le lieu
+rejoint la liste de Réglages (même clé `CLE_LIEUX`, pas de migration) au rayon par défaut de 120 m : les recharges au même
+endroit, passées comme à venir, prennent le nom. ⚠️ `SchemaLieu` : `mode` et `tarif` deviennent FACULTATIFS, mais vont
+ensemble (refus sinon). Sans tarif, le nom s'affiche et `prixSession` traite le lieu comme inconnu : le coût reste une
+estimation, jamais un tarif par défaut. Avec un tarif au kWh, le coût passe à « mesure » ; une borne horaire dont la durée est une
+fenêtre de sondage reste un plafond (règle du 17/09, inchangée). Nom déjà pris : refusé (Retirer désigne par le nom). Lieu voisin :
+accepté, la réponse le signale (le plus proche gagne). Le contrôle navigateur rejoue le geste sur la base fictive (positions
+fictives de la liste blanche, la voiture dort la nuit à un point sans nom) : `preuve-activite-avant.png` / `-apres.png`.
+Verrous : `tests/nommerLieu.test.ts`, `tests/preuveEcran.test.ts`.
 
 ## 21/10 — Sauvegarde externe chiffrée, voie B (CarAI#13)
 

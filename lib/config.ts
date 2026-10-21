@@ -91,15 +91,23 @@ export type Bail = z.infer<typeof SchemaBail>;
  * ⚠️ Aucune valeur par défaut : un lieu inventé apparierait des recharges au mauvais tarif.
  * Tant que la liste est vide, les recharges se chiffrent au mieux et le disent.
  */
-export const SchemaLieu = z.object({
-  nom: z.string().min(1).max(40),
-  lat: z.number().min(-90).max(90),
-  lng: z.number().min(-180).max(180),
-  // Un stationnement fait quelques dizaines de mètres ; 2 km apparierait le quartier.
-  rayonM: z.number().int().min(20).max(2_000).default(120),
-  mode: z.enum(["horaire", "kwh"]),
-  tarif: z.number().nonnegative(),
-});
+export const SchemaLieu = z
+  .object({
+    nom: z.string().min(1).max(40),
+    lat: z.number().min(-90).max(90),
+    lng: z.number().min(-180).max(180),
+    // Un stationnement fait quelques dizaines de mètres ; 2 km apparierait le quartier.
+    rayonM: z.number().int().min(20).max(2_000).default(120),
+    // Le tarif est FACULTATIF (CarAI#8) : un lieu nommé après coup, depuis Activité, n'a pas de
+    // tarif tant que Marc n'en a pas saisi un. Les deux vont ensemble : un mode sans tarif, ou
+    // l'inverse, ne chiffrerait rien et serait un lieu à moitié bon.
+    mode: z.enum(["horaire", "kwh"]).optional(),
+    tarif: z.number().nonnegative().optional(),
+  })
+  .refine((l) => (l.mode === undefined) === (l.tarif === undefined), {
+    message: "le mode de facturation et le tarif vont ensemble",
+    path: ["tarif"],
+  });
 export type Lieu = z.infer<typeof SchemaLieu>;
 
 export const SchemaLieux = z.array(SchemaLieu).max(50);
