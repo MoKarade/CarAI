@@ -195,6 +195,10 @@ describe("alignement matcher ↔ isPublicPath", () => {
       "/favicon.icoX/x",
       "/sw.js/x",
       "/api/mcp.x/token",
+      // LIA : la route reste derrière la session (jamais une exclusion du matcher).
+      "/api/lia/ask",
+      "/api/lia/askX",
+      "/api/lia/ask/x",
     ])("%s reste GARDÉ", (chemin) => {
       expect(gardee(chemin)).toBe(true);
     });
