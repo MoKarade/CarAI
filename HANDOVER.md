@@ -2,7 +2,16 @@
 
 > À lire en premier à chaque reprise de session.
 
-**Dernière mise à jour** : 2026-10-21 · branche `claude/nommer-lieu-recharge`
+**Dernière mise à jour** : 2026-10-22 · branche `claude/project-thread-pneku1`
+
+## 22/10 — Icône de CarAI = logo série A (CarAI#74, mission .github#467)
+
+Marc a validé le 21/10 la série de logos A : une voiture avec un éclair, dessin vert `#A3E635` sur tuile sombre `#0B0D12`, étincelle IA
+argent `#E6EAF2`. `app/icon.svg` (onglet, traits épais) et les PNG `public/icon-192`, `icon-512`, `icon-maskable-512` (plein cadre) et
+`apple-touch-icon` (180 px) sont régénérés depuis ce dessin ; noms de fichiers et manifeste inchangés. Il n'y a pas d'autre marque dans
+l'application (le menu est du texte ; `IcoEclair` reste une icône d'interface). Le service worker ne met rien en cache : l'icône change
+au prochain chargement. Une PWA déjà installée se rafraîchit seule en quelques jours sur Android et PC ; sur iPhone, retirer l'app de
+l'écran d'accueil puis la rajouter.
 
 ## 21/10 — « Nommer ce lieu » sur une recharge au lieu inconnu (CarAI#8)
 

@@ -36,7 +36,7 @@ function Socle({ taille = 20, children, ...reste }: Props) {
   );
 }
 
-/** Éclair — charge, énergie. Le motif de l'icône de l'app. */
+/** Éclair — charge, énergie. Le même éclair que sur le logo de l'app (la voiture et son éclair). */
 export function IcoEclair(p: Props) {
   return (
     <Socle {...p}>
