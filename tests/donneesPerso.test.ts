@@ -14,6 +14,8 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { registerCommands } from "@/mcp/tools/commands.tools";
 
 const sha = (s: string): string => createHash("sha256").update(s).digest("hex");
 
@@ -166,5 +168,13 @@ describe("aucune donnée personnelle dans les fichiers versionnés", () => {
     expect(empreintesInterdites("valeur 8888 km", ensemblesFictifs)).toEqual(["(nombre interdit)"]);
     expect(empreintesInterdites("date 2099-01-01", ensemblesFictifs)).toEqual(["(date interdite)"]);
     expect(empreintesInterdites("texte neutre sans rien", ensemblesFictifs)).toEqual([]);
+  });
+
+  it("aucune commande n'est appelable depuis l'assistant (lecture seule)", () => {
+    const server = new McpServer({ name: "test-server", version: "1.0.0" });
+    registerCommands(server);
+    // @ts-expect-error _registeredTools est une propriété interne de McpServer
+    const registeredTools = server._registeredTools ?? {};
+    expect(Object.keys(registeredTools)).toEqual([]);
   });
 });
