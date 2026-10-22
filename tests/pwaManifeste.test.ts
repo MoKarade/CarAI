@@ -75,4 +75,12 @@ describe("[PWA-ANDROID] le manifeste rend l'app installable", () => {
       expect(hauteur).toBe(attendu);
     }
   });
+
+  it("fournit un favicon.ico valide avec un en-tête ICO et 3 images", () => {
+    const buf = readFileSync(chemin("favicon.ico"));
+    const entete = buf.subarray(0, 4);
+    expect(entete.equals(Buffer.from([0x00, 0x00, 0x01, 0x00]))).toBe(true);
+    const nombreImages = buf.readUInt16LE(4);
+    expect(nombreImages).toBe(3);
+  });
 });
