@@ -4,6 +4,13 @@
 
 **Dernière mise à jour** : 2026-10-22 · branche `claude/project-thread-pneku1`
 
+## 22/10 — CarAI#93 : LIA, l'assistant, branchée sur les pages connectées
+
+- `@mokarade/lia-ui` v0.1.0 (tag, jamais une branche) monté dans `app/layout.tsx` par `components/LiaMontee.tsx`, seulement quand `requireSession()` passe : pas sur `/login`. Clic = discussion, clic droit = menu.
+- Route `POST /api/lia/ask` (`app/api/lia/ask/route.ts`) : derrière le middleware (jamais dans ses exclusions, verrou `tests/auth.test.ts`) ET `requireSession()`, relaie la question au hub avec `HUB_TOKEN` (le hub parle à MemoryAI). Elle dit au hub si la session est celle du propriétaire (`AUTHORIZED_EMAIL`) : un invité n'atteint pas la mémoire de Marc. Échec fermé : sans réponse conforme, LIA dit « indisponible ».
+- Copie de la référence `app-template` (`lib/lia/`, tests `tests/lia.*.test.ts`), sans écart. Détail et contrat : `docs/claude/13-lia.md`.
+- **Tant que `POST /api/lia/ask` n'existe pas chez le hub (Hubperso#337) et MemoryAI**, LIA vit mais répond « indisponible ».
+
 ## 22/10 — Icône de CarAI = logo série A (CarAI#74, mission .github#467)
 
 Marc a validé le 21/10 la série de logos A : une voiture avec un éclair, dessin vert `#A3E635` sur tuile sombre `#0B0D12`, étincelle IA
