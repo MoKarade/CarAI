@@ -4,7 +4,7 @@ import type { MetadataRoute } from "next";
  * Manifeste d'application web — c'est lui qui rend CarAI INSTALLABLE (téléphone et PC).
  *
  * Servi par Next sur `/manifest.webmanifest`. Aucune ressource externe : les icônes sont
- * dans `public/`, générées depuis `app/icon.svg` (l'éclair de recharge de l'app).
+ * dans `public/`, générées depuis `app/icon.svg` (logo série A : la voiture et son éclair, avec l'étincelle IA).
  *
  * ⚠️ ACCESSIBLE SANS SESSION, ET C'EST NÉCESSAIRE. Le navigateur récupère le manifeste
  * SANS cookies ; derrière le garde, il recevrait la redirection vers `/login` et l'app
