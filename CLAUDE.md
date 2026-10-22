@@ -33,7 +33,7 @@
 ## Pour aller plus loin (à lire seulement si nécessaire)
 - Index généré : `docs/INDEX.md` ; anciens titres -> chemins : `docs/correspondance.md`.
 - Sections de l'ancien fichier : `docs/claude/` (`01-principes`, `02-conventions`, `03-workflow-git`, `04-commandes`, `05-verifications`, `06-deploiement`,
-  `06-bis-quota-deploiement`, `07-hub`, `08-documentation`, `10-style-compte-rendu`, `11-ce-qui-na-pas-pu-etre-verifie`). Leçons apprises : `docs/LESSONS.md`.
+  `06-bis-quota-deploiement`, `07-hub`, `08-documentation`, `10-style-compte-rendu`, `11-ce-qui-na-pas-pu-etre-verifie`, `13-lia` : assistant LIA, route `/api/lia/ask`). Leçons apprises : `docs/LESSONS.md`.
 - Architecture (choix techniques réels et pourquoi) : `docs/ARCHITECTURE.md`. Photographie de l'état courant : `docs/ETAT.md`.
 - Coûts (minutes Actions, quota, appels IA) : `docs/couts.md`. Rattachement : `docs/rattachement.md`.
 - Graphe de code (hooks et MCP `graphify` posés, 0 jeton ; `scripts/graphe.sh query|affected|path|explain` avant de grepper ; wiki : `graphify-out/wiki/index.md`) : `docs/claude/12-graphe-code.md`.

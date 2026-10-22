@@ -2,7 +2,7 @@
 
 <!-- GÉNÉRÉ par `node .github/ci/generer-index.mjs` : ne pas modifier à la main (`--verifier` échoue si ce fichier est périmé). -->
 
-24 document(s). Ancien titre -> nouveau chemin : [correspondance.md](correspondance.md).
+25 document(s). Ancien titre -> nouveau chemin : [correspondance.md](correspondance.md).
 
 ## docs/
 
@@ -36,3 +36,4 @@
 - [Style et compte-rendu](claude/10-style-compte-rendu.md) — `docs/claude/10-style-compte-rendu.md`
 - [Ce qui n'a pas pu être vérifié (et où ça en est)](claude/11-ce-qui-na-pas-pu-etre-verifie.md) — `docs/claude/11-ce-qui-na-pas-pu-etre-verifie.md`
 - [12 — Graphe de code local (graphifyy) : hooks, wiki et MCP](claude/12-graphe-code.md) — `docs/claude/12-graphe-code.md`
+- [13. LIA dans l'app](claude/13-lia.md) — `docs/claude/13-lia.md`

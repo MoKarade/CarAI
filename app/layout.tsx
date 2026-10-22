@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { ServiceWorker } from "@/components/ServiceWorker";
+import LiaMontee from "@/components/LiaMontee";
+import { liaAutorisee } from "@/lib/lia/monter";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -33,12 +35,14 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const lia = await liaAutorisee();
   return (
     <html lang="fr-CA">
       <body>
         {children}
         <ServiceWorker />
+        {lia ? <LiaMontee /> : null}
         <Analytics />
       </body>
     </html>
