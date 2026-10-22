@@ -97,7 +97,7 @@ jobs:
     # Plafond : sans lui, un job fige tourne SIX HEURES avant d'echouer (vecu sur
     # DriveAI le 19/08/2026). Calibre sur la duree reelle — non observe - job reseau.
     timeout-minutes: 15
-    runs-on: [self-hosted, pc-marc]
+    runs-on: ${{ github.event.repository.visibility == 'public' && 'ubuntu-latest' || fromJSON('["self-hosted","pc-marc"]') }} # dépôt public : machines GitHub (gratuites) ; privé : robot du PC
     steps:
       - name: Lire les signaux et les enregistrer
         env:
