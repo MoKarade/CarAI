@@ -6,7 +6,7 @@
 
 ## 22/10 — CarAI#93 : LIA, l'assistant, branchée sur les pages connectées
 
-- `@mokarade/lia-ui` v0.1.0 (tag, jamais une branche) monté dans `app/layout.tsx` par `components/LiaMontee.tsx`, seulement quand `requireSession()` passe : pas sur `/login`. Clic = discussion, clic droit = menu.
+- `@mokarade/lia-ui` v0.2.1 (tag, jamais une branche ; elle suit le curseur et le défilement et vit comme dans la maquette, sans parole spontanée tant que l'app ne branche pas `onSpontane`) monté dans `app/layout.tsx` par `components/LiaMontee.tsx`, seulement quand `requireSession()` passe : pas sur `/login`. Clic = discussion, clic droit = menu.
 - Route `POST /api/lia/ask` (`app/api/lia/ask/route.ts`) : derrière le middleware (jamais dans ses exclusions, verrou `tests/auth.test.ts`) ET `requireSession()`, relaie la question au hub avec `HUB_TOKEN` (le hub parle à MemoryAI). Elle dit au hub si la session est celle du propriétaire (`AUTHORIZED_EMAIL`) : un invité n'atteint pas la mémoire de Marc. Échec fermé : sans réponse conforme, LIA dit « indisponible ».
 - Copie de la référence `app-template` (`lib/lia/`, tests `tests/lia.*.test.ts`), sans écart. Détail et contrat : `docs/claude/13-lia.md`.
 - **Tant que `POST /api/lia/ask` n'existe pas chez le hub (Hubperso#337) et MemoryAI**, LIA vit mais répond « indisponible ».
