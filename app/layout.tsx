@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { ServiceWorker } from "@/components/ServiceWorker";
-import LiaMontee from "@/components/LiaMontee";
+import LiaDemarrage from "@/components/LiaDemarrage";
 import { liaAutorisee } from "@/lib/lia/monter";
 import "./globals.css";
 
@@ -42,7 +42,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body>
         {children}
         <ServiceWorker />
-        {lia ? <LiaMontee /> : null}
+        {lia ? <LiaDemarrage /> : null}
         <Analytics />
       </body>
     </html>
