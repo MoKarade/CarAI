@@ -2,7 +2,11 @@
 
 > À lire en premier à chaque reprise de session.
 
-**Dernière mise à jour** : 2026-10-23 · branche `claude/poll-sans-robot-pc`
+**Dernière mise à jour** : 2026-10-23 · branche `claude/lia-ui-v0-14-0`
+
+## 23/10 — LIA : lia-ui v0.14.0
+
+- `@mokarade/lia-ui` passe de v0.13.0 à **v0.14.0** (tag, commit `dbe316…`, lia-ui#47) ; aucun changement de code : parole propre et physique sont par défaut dans le paquet, aucune option dans `components/LiaMontee.tsx`. Le verrou `tests/liaMouvement.test.ts` (≥ 0.13.0) reste valable.
 
 ## 23/10 — CarAI#16 : le poll Smartcar sans le robot du PC
 
