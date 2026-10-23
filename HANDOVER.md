@@ -2,7 +2,11 @@
 
 > À lire en premier à chaque reprise de session.
 
-**Dernière mise à jour** : 2026-10-23 · branche `claude/lia-ui-v0-12-2`
+**Dernière mise à jour** : 2026-10-23 · branche `claude/lia-ui-v0-13-0`
+
+## 23/10 — LIA : lia-ui v0.13.0
+
+- `@mokarade/lia-ui` passe de v0.12.2 à **v0.13.0** (tag, `4ccdb41`) ; réglages inchangés (aucune option dans `components/LiaMontee.tsx`). Verrou `tests/liaMouvement.test.ts` relevé à ≥ 0.13.0.
 
 ## 23/10 — LIA : lia-ui v0.12.2, la même partout
 
