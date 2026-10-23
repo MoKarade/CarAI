@@ -2,7 +2,11 @@
 
 > À lire en premier à chaque reprise de session.
 
-**Dernière mise à jour** : 2026-10-23 · branche `claude/lia-ui-v0-15-0`
+**Dernière mise à jour** : 2026-10-23 · branche `claude/lia-demarrage-hors-rendu`
+
+## 23/10 — LIA : présente tout le temps (lia-ui v0.16.0, CarAI#124)
+
+- `@mokarade/lia-ui` passe de v0.15.0 à **v0.16.0** (tag, commit `3061f1…`). LIA est démarrée par `demarrerLia` (`@mokarade/lia-ui/boot`) au chargement du module `components/LiaDemarrage.tsx` (remplace `components/LiaMontee.tsx` et `<Lia />`, une seule voie) : elle se pose dans `document.body` hors du rendu, donc même pendant un chargement ou si une page plante. L'accès ne change pas : le layout ne rend `LiaDemarrage` que si `liaAutorisee()` est vrai, donc pas de LIA sur `/login` ni pour un refus. Verrou : `tests/liaMouvement.test.ts` (voie unique, aucun réglage commun posé, démarrage hors effet).
 
 ## 23/10 — LIA : lia-ui v0.15.0
 
