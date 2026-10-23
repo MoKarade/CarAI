@@ -39,7 +39,7 @@
 - Graphe de code (hooks et MCP `graphify` posés, 0 jeton ; `scripts/graphe.sh query|affected|path|explain` avant de grepper ; wiki : `graphify-out/wiki/index.md`) : `docs/claude/12-graphe-code.md`.
 
 ## CI (dépôt privé)
-Les jobs déclenchés par une PR choisissent leur machine selon la visibilité du dépôt : privé, robot de tests du PC de Marc (`[self-hosted, pc-marc]`) ; public, machines GitHub (gratuites). Un robot du PC ne doit jamais servir une PR d'un dépôt public. `smartcar-poll.yml` (planifié) reste sur le PC.
+Les jobs déclenchés par une PR choisissent leur machine selon la visibilité du dépôt : privé, robot de tests du PC de Marc (`[self-hosted, pc-marc]`) ; public, machines GitHub (gratuites). Un robot du PC ne doit jamais servir une PR d'un dépôt public. `smartcar-poll.yml` (planifié) tourne toujours sur les machines GitHub (`ubuntu-latest`), jamais sur le PC.
 
 ## Compte-rendu
 Règles de forme : instructions du projet « Apps ». Copie lisible à la demande dans `docs/COMPTE-RENDU.md` (non chargée à chaque session ; sa synchro reste vérifiée par la CI).

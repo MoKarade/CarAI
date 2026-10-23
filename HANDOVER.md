@@ -2,7 +2,13 @@
 
 > À lire en premier à chaque reprise de session.
 
-**Dernière mise à jour** : 2026-10-23 · branche `claude/lia-ui-v0-13-0`
+**Dernière mise à jour** : 2026-10-23 · branche `claude/poll-sans-robot-pc`
+
+## 23/10 — CarAI#16 : le poll Smartcar sans le robot du PC
+
+- `.github/workflows/smartcar-poll.yml` : `runs-on: ubuntu-latest`, plus aucune mention de `self-hosted` ni de `pc-marc` (décision de Marc : le dépôt est public). Les autres workflows gardent le choix par visibilité (`ci.yml`, `garde-fou.yml`…). Verrou de source dans `tests/pollJournalPublic.test.ts`.
+- Preuves déjà posées : le lancement planifié 39999554737 du 23/10 (18:11Z) a tourné sur une machine GitHub avec « HTTP 200 » et `ok:true` (CarAI#84) ; depuis la PR #103 le journal n'écrit plus que le code HTTP et un verdict court.
+- La ligne de `CLAUDE.md` qui disait que ce poll reste sur le PC est corrigée.
 
 ## 23/10 — LIA : lia-ui v0.13.0
 

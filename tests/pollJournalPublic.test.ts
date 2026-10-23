@@ -35,6 +35,15 @@ describe("le journal du workflow de poll n'écrit pas le corps de la réponse", 
     expect(actives.filter((l) => /::debug::|ACTIONS_STEP_DEBUG/.test(l))).toEqual([]);
   });
 
+  it("tourne sur les machines GitHub, jamais sur le robot du PC (dépôt public)", () => {
+    const actives = yaml
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => !l.startsWith("#"));
+    expect(actives.filter((l) => /self-hosted|pc-marc/.test(l))).toEqual([]);
+    expect(actives).toContain("runs-on: ubuntu-latest");
+  });
+
   it("écrit le verdict court sous trois formes seulement", () => {
     for (const verdict of ["verdict : ok=false", "verdict : ok=true", "verdict : illisible"]) {
       expect(yaml).toContain(`echo "${verdict}"`);
