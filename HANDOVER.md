@@ -2,7 +2,11 @@
 
 > À lire en premier à chaque reprise de session.
 
-**Dernière mise à jour** : 2026-10-23 · branche `claude/lia-ui-v0-14-0`
+**Dernière mise à jour** : 2026-10-23 · branche `claude/lia-ui-v0-15-0`
+
+## 23/10 — LIA : lia-ui v0.15.0
+
+- `@mokarade/lia-ui` passe de v0.14.0 à **v0.15.0** (tag, commit `cff62b…`) ; aucun changement de code : `ask` reçoit un 3e argument `contexte` optionnel que `LiaMontee` ignore. LIA répond sur son humeur, analyse tout élément et s'ouvre par appui long au tactile (portés par le paquet). Verrou `tests/liaMouvement.test.ts` (≥ 0.13.0) inchangé.
 
 ## 23/10 — LIA : lia-ui v0.14.0
 
