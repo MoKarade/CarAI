@@ -2,7 +2,12 @@
 
 > À lire en premier à chaque reprise de session.
 
-**Dernière mise à jour** : 2026-10-22 · branche `claude/project-thread-pneku1`
+**Dernière mise à jour** : 2026-10-23 · branche `claude/lia-ui-v0-12-2`
+
+## 23/10 — LIA : lia-ui v0.12.2, la même partout
+
+- `@mokarade/lia-ui` passe de v0.2.1 à **v0.12.2** (tag `bf2c744`). Aucune option réglée dans `components/LiaMontee.tsx` : le mouvement complet (même si le système demande de réduire les animations) et la pastille d'humeur du paquet sont ses défauts, comme au hub (`Hubperso` `components/LiaHub.tsx`). Verrou de source `tests/liaMouvement.test.ts` (pas de `quandMouvementReduit` ni `humeurVisible`, version ≥ 0.12.2).
+- Non branché ici, volontairement (hors tâche) : `etat` (état partagé de LIA chez MemoryAI), `onSpontane`, `entrees`, `monde`.
 
 ## 22/10 — CarAI#93 : LIA, l'assistant, branchée sur les pages connectées
 
