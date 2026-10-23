@@ -122,8 +122,10 @@ jobs:
           statut=$(echo "$reponse" | tail -n1)
           corps=$(echo "$reponse" | sed '$d')
 
+          # ⚠️ Dépôt PUBLIC : les journaux de ce run sont lisibles de tous. Le corps de la
+          # réponse (comptes de signaux, motifs d'échec) n'y est donc JAMAIS écrit : seulement
+          # le code HTTP et un verdict court. Le détail vit dans la page Données de l'app.
           echo "HTTP ${statut}"
-          echo "$corps"
 
           # 401 = secret qui ne correspond pas ; 503 = CRON_SECRET absent côté Vercel.
           # Les deux sont des erreurs de CONFIGURATION, pas des pannes du véhicule : elles
@@ -140,7 +142,13 @@ jobs:
 
           # Un poll qui échoue en amont (quota, véhicule non connecté) est SIGNALÉ en
           # avertissement : le run reste vert — ce n'est pas une régression de CarAI — mais
-          # le motif est lisible d'un coup d'œil dans l'onglet Actions.
+          # le motif se lit dans la page Données de l'app, jamais dans ce journal public.
           if echo "$corps" | grep -q '"ok":false'; then
-            echo "::warning::Poll sans écriture — voir le champ 'raison' ci-dessus."
+            echo "verdict : ok=false"
+            echo "::warning::Poll sans écriture — voir la page Données de l'app."
+          elif echo "$corps" | grep -q '"ok":true'; then
+            echo "verdict : ok=true"
+          else
+            echo "verdict : illisible"
+            echo "::warning::Réponse du poll illisible — voir la page Données de l'app."
           fi
