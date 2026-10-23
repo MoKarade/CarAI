@@ -3,4 +3,4 @@ Ce fichier ne sert qu'à FORCER un build de production : le modifier fait constr
 À utiliser après un changement de variable d'environnement dans Vercel, qui ne change aucun
 fichier. Ne jamais y mettre de valeur : seulement la date et la raison.
 
-Dernière reconstruction demandée : 2026-10-21, aucun déploiement de production créé pour le commit e5c93ee (CarAI#8).
+Dernière reconstruction demandée : 2026-10-23, nouvelle valeur de HUB_TOKEN à appliquer.
