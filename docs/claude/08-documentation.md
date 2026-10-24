@@ -9,7 +9,7 @@
 | `README.md` | À quoi sert l'app, pour un lecteur extérieur. |
 | `CLAUDE.md` | Ce fichier. Se charge à **chaque session** → il reste **court**. |
 | `HANDOVER.md` | L'état RÉEL : ce qui tourne, ce qui reste à configurer. À lire en premier. |
-| Issues du dépôt (`BACKLOG.md` n'est qu'un renvoi) | Ce qui est décidé mais pas fait. |
+| `BACKLOG.md` | Ce qui est décidé mais pas fait. |
 | `docs/adr/` | Décisions architecturales, `NNNN-slug.md`. |
 | `docs/SMARTCAR_API.md` | Ce que l'API Smartcar rend vraiment, mesuré. |
 

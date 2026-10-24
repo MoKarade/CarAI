@@ -7,7 +7,7 @@
 - Sources : **Smartcar** (`lib/smartcar/`, officielle, socle stable) et **Toyota NA** (`lib/toyota/`, non officielle, fragile, jamais le socle).
 - Stack : Next.js 16 · Neon + Drizzle · Auth.js v5 (`providers: []`, la session vient du hub) · Zod · Vitest · SDK MCP.
 - Déploiement : `carai.hubperso.com` (Vercel), dépôt privé, branche par défaut `main`. Marc valide, il ne code pas.
-- État : `HANDOVER.md` (à lire en premier) ; plan : les issues du dépôt (`BACKLOG.md` n'est qu'un renvoi) ; décisions : `docs/adr/`.
+- État : `HANDOVER.md` (à lire en premier) ; plan : `BACKLOG.md` ; décisions : `docs/adr/`.
 
 ## Commandes standard
 - `npm run dev` : serveur local. `npm run build` : compilation de production.

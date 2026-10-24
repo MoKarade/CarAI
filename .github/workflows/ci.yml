@@ -263,7 +263,8 @@ jobs:
 
   # Grille de conformité : le tableau s'écrit dans le résumé du job. `bloquant: false` tant qu'une ligne
   # reste rouge : la ligne 6 attend deux réglages GitHub de Marc (scan de secrets, protection au push,
-  # CarAI#135) ; passer à `true` quand toute la grille est verte.
+  # CarAI#135) et la ligne 11 la réduction de BACKLOG.md (CarAI#138) ; passer à `true` quand toute la
+  # grille est verte.
   conformite:
     name: Conformité
     if: github.event_name != 'schedule'

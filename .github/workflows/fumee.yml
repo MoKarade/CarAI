@@ -9,7 +9,7 @@ name: Fumée de production
 # Le contrôle « summary » est volontairement ABSENT (chemin-summary vide) : il exige le secret HUB_TOKEN du
 # dépôt, qui n'y est pas posé (Vercel ne laisse pas relire la valeur d'un secret masqué). Sans ce secret le
 # contrôle serait rouge à chaque déploiement (« jeton du hub absent »). À rétablir le jour où le secret est
-# posé (CarAI#136) : retirer `chemin-summary: ""` et ajouter le bloc `secrets: hub-token: ${{ secrets.HUB_TOKEN }}`.
+# posé (CarAI#136) : retirer `chemin-summary: ""` et passer le jeton du hub au workflow commun.
 on:
   deployment_status:
 
