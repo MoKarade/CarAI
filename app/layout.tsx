@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { ServiceWorker } from "@/components/ServiceWorker";
 import LiaDemarrage from "@/components/LiaDemarrage";
-import { liaAutorisee } from "@/lib/lia/monter";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -35,14 +34,15 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const lia = await liaAutorisee();
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr-CA">
       <body>
         {children}
         <ServiceWorker />
-        {lia ? <LiaDemarrage /> : null}
+        {/* LIA sans condition de session (Marc, 23/10/2026 : présente tout le temps). Sans session, sa
+            question reçoit 401 de la route, protégée : elle répond « indisponible », jamais autre chose. */}
+        <LiaDemarrage />
         <Analytics />
       </body>
     </html>
