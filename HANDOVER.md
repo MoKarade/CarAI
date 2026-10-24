@@ -2,7 +2,11 @@
 
 > À lire en premier à chaque reprise de session.
 
-**Dernière mise à jour** : 2026-10-24 · branche `claude/lia-ui-v0-23-1`
+**Dernière mise à jour** : 2026-10-24 · branche `claude/lia-v0-28`
+
+## 24/10 — LIA : lia-ui v0.28.0 (CarAI#140)
+
+- `@mokarade/lia-ui` passe de v0.23.1 à **v0.28.0** (tag, commit `ffea03…`) ; aucun changement de code : `demarrerLia` et `ask` gardent leur signature. Contrôle demandé par le coordinateur : le rendu serveur ne casse pas (`/login` répond 200, relu en local sur le build de la PR et en production après déploiement).
 
 ## 24/10 — Contrôles communs de MoKarade/.github (CarAI#15)
 
