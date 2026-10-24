@@ -4,6 +4,11 @@
 
 **Dernière mise à jour** : 2026-10-24 · branche `claude/lia-ui-v0-23-1`
 
+## 24/10 — Contrôles communs de MoKarade/.github (CarAI#15)
+
+- `.github/workflows/ci.yml` appelle `securite.yml` (job `securite-commune`, à côté de `securite` : le renommer changerait le contrôle que `.mergify.yml` exige ; apporte OSV-Scanner et CodeQL) et `conformite.yml` (`bloquant: false`). Nouveau `.github/workflows/fumee.yml` : fumée de production (santé, connexion) après chaque déploiement `Production`, sans contrôle summary tant que `HUB_TOKEN` n'est pas un secret du dépôt (CarAI#136).
+- Grille lue le 24/10 en local avec le script commun : 9 vert, 5 rouge, 1 à relire. Corrigées ici : ligne 2 (gabarit inutilisé `ci-reutilisable.yml` retiré), 5 (fumée), 8 (`vercel.json` : `**` et `*` coupés, `main` seule déployée), 11 (`BACKLOG.md` réduit à un renvoi vers les issues). Ligne 6 : CodeQL et OSV par `securite-commune` ; reste le scan de secrets et la protection au push, réglages que seul Marc active (CarAI#135). Ligne 10 : à relire par nature (la sauvegarde vit sur le PC).
+
 ## 24/10 — LIA : lia-ui v0.23.1 (CarAI#131)
 
 - `@mokarade/lia-ui` passe de v0.16.0 à **v0.23.1** (tag, commit `23dbd4…`) ; aucun changement de code : les nouvelles options du paquet (cadre d'analyse, humeurs récentes, physique, bonds, état partagé) sont toutes facultatives et `demarrerLia` / `ask` gardent leur signature. Le démarrage hors du rendu et le verrou `tests/liaMouvement.test.ts` (≥ 0.16) restent valables.
