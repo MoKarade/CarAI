@@ -2,7 +2,11 @@
 
 > À lire en premier à chaque reprise de session.
 
-**Dernière mise à jour** : 2026-10-24 · branche `claude/lia-v0-28`
+**Dernière mise à jour** : 2026-10-24 · branche `claude/backlog-renvoi-2`
+
+## 24/10 — BACKLOG.md réduit à un renvoi (CarAI#138)
+
+- `BACKLOG.md` (747 lignes) n'est plus qu'un renvoi vers les issues du dépôt, comme dans app-template : la ligne 11 de la grille de conformité passe au vert. Fait en deux PR (#143 puis celle-ci) parce que la règle de taille compte les suppressions ; l'ancien texte reste dans l'historique git. `CLAUDE.md`, `docs/claude/00-introduction.md`, `docs/claude/08-documentation.md` et `docs/ETAT.md` ne le présentent plus comme le plan. Les anciennes entrées de ce journal qui citent `BACKLOG.md` ou des identifiants `[XXX-NN]` décrivent l'état de leur date.
 
 ## 24/10 — LIA : lia-ui v0.28.0 (CarAI#140)
 
