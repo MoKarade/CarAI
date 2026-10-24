@@ -2,7 +2,12 @@
 
 > À lire en premier à chaque reprise de session.
 
-**Dernière mise à jour** : 2026-10-23 · branche `claude/lia-demarrage-hors-rendu`
+**Dernière mise à jour** : 2026-10-24 · branche `claude/lia-ui-v0-23-1`
+
+## 24/10 — LIA : lia-ui v0.23.1 (CarAI#131)
+
+- `@mokarade/lia-ui` passe de v0.16.0 à **v0.23.1** (tag, commit `23dbd4…`) ; aucun changement de code : les nouvelles options du paquet (cadre d'analyse, humeurs récentes, physique, bonds, état partagé) sont toutes facultatives et `demarrerLia` / `ask` gardent leur signature. Le démarrage hors du rendu et le verrou `tests/liaMouvement.test.ts` (≥ 0.16) restent valables.
+- Constat en chemin (CarAI#132, pas corrigé ici) : en local, `/login` sans session affiche aussi LIA, sur v0.16.0 comme sur v0.23.1 ; la phrase « pas de LIA sur `/login` » de #124 était fausse. Sans conséquence en production (`/login` redirige vers le hub, `/api/lia/ask` reste derrière le proxy).
 
 ## 23/10 — LIA : présente tout le temps (lia-ui v0.16.0, CarAI#124)
 
