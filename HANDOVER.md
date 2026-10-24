@@ -2,7 +2,11 @@
 
 > À lire en premier à chaque reprise de session.
 
-**Dernière mise à jour** : 2026-10-24 · branche `claude/backlog-renvoi-2`
+**Dernière mise à jour** : 2026-10-24 · branche `claude/lia-v0-32`
+
+## 24/10 — LIA : lia-ui v0.32.0 (CarAI#147)
+
+- `@mokarade/lia-ui` passe de v0.28.0 à **v0.32.0** (tag, commit `09781a…`) : nanobots, pensée, pause et souvenirs, portés par le paquet ; aucun changement de code : `demarrerLia` et `ask` gardent leur signature. `/login` répond 200 (relu en local sur le build de la PR et en production après déploiement).
 
 ## 24/10 — BACKLOG.md réduit à un renvoi (CarAI#138)
 
