@@ -34,10 +34,12 @@ par défaut (`TOYOTA_NA_ENABLED`).
   GitHub Actions, décodeur Draco désynchronisé) corrigés le 29/09/2026, branche
   `agence/carai-38/tests-rouges`, déjà récupérée par les copies du chantier `st-carai`.
 
-## Ce que le BACKLOG dit lui-même de sa frontière (recensé 18/09/2026)
+## Ce que le BACKLOG disait lui-même de sa frontière (recensé 18/09/2026)
+
+> Depuis le 24/10/2026 (CarAI#138), `BACKLOG.md` n'est plus qu'un renvoi vers les issues ; le texte cité ci-dessous est lisible dans l'historique git (`git log -p -- BACKLOG.md`).
 
 `BACKLOG.md` classe ce qui reste en quatre familles, et le dit explicitement : sauf
 `[QUAL-01]`, aucun item restant ne se débloque en codant plus — chacun attend un geste ou
 un arbitrage de Marc, ou une donnée qui n'arrive jamais
 (`tractionbattery-capacity`, jamais livrée par la bZ, mesuré). Détail des items et de leurs
-identifiants : `BACKLOG.md`, section « Où passe la frontière ».
+identifiants : l'ancien `BACKLOG.md`, section « Où passe la frontière ».
