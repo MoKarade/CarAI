@@ -1,32 +1,28 @@
-// tests/lia.monter.test.ts — LIA n'est montée que pour une session admise.
+// tests/lia.monter.test.ts — LIA est montée sur toutes les pages, sans condition de session
+// (Marc, 23/10/2026 : « présente tout le temps »). Verrou de source : la condition vivait dans le layout,
+// c'est là qu'elle reviendrait.
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
 
-const { requireSession, NonAutorise } = vi.hoisted(() => ({
-  requireSession: vi.fn(),
-  NonAutorise: class NonAutorise extends Error {},
-}));
-vi.mock("@/lib/session", () => ({ requireSession, NonAutorise }));
+const racine = join(__dirname, "..");
+const layout = readFileSync(join(racine, "app", "layout.tsx"), "utf8");
 
-import { liaAutorisee } from "../lib/lia/monter";
-
-beforeEach(() => {
-  requireSession.mockReset();
-});
-
-describe("liaAutorisee", () => {
-  it("session admise : vrai", async () => {
-    requireSession.mockResolvedValue({ email: "marc@exemple.test" });
-    expect(await liaAutorisee()).toBe(true);
+describe("LIA montée sans condition de session", () => {
+  it("le layout rend <LiaDemarrage /> sans condition", () => {
+    expect(layout).toMatch(/^\s*<LiaDemarrage \/>\s*$/m);
+    expect(layout).not.toMatch(/\{[^}]*\?\s*<LiaDemarrage/);
+    expect(layout).not.toMatch(/&&\s*<LiaDemarrage/);
   });
 
-  it("pas de session (page de connexion) : faux", async () => {
-    requireSession.mockRejectedValue(new NonAutorise());
-    expect(await liaAutorisee()).toBe(false);
+  it("le layout ne lit pas la session : plus de liaAutorisee ni de requireSession", () => {
+    expect(layout).not.toContain("liaAutorisee");
+    expect(layout).not.toContain("requireSession");
+    expect(existsSync(join(racine, "lib", "lia", "monter.ts"))).toBe(false);
   });
 
-  it("toute autre erreur remonte", async () => {
-    requireSession.mockRejectedValue(new Error("panne"));
-    await expect(liaAutorisee()).rejects.toThrow("panne");
+  it("LIA reste sur /login : la page de connexion n'a pas son propre gabarit", () => {
+    expect(existsSync(join(racine, "app", "login", "layout.tsx"))).toBe(false);
   });
 });

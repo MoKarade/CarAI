@@ -46,8 +46,8 @@ describe("LiaDemarrage : présente tout le temps, une seule voie", () => {
     expect(existsSync(join(racine, "components", "LiaMontee.tsx"))).toBe(false);
   });
 
-  it("le layout ne rend LiaDemarrage que pour une session admise (jamais sur /login)", () => {
-    expect(layout).toContain("liaAutorisee");
-    expect(layout).toContain("{lia ? <LiaDemarrage /> : null}");
+  it("le layout rend LiaDemarrage sans condition de session (aussi sur /login)", () => {
+    expect(layout).not.toContain("liaAutorisee");
+    expect(layout).toContain("<LiaDemarrage />");
   });
 });

@@ -2,7 +2,13 @@
 
 > À lire en premier à chaque reprise de session.
 
-**Dernière mise à jour** : 2026-10-24 · branche `claude/lia-v0-32`
+**Dernière mise à jour** : 2026-10-24 · branche `claude/lia-toujours`
+
+## 24/10 — LIA présente sur toutes les pages, `/login` comprise (CarAI#132)
+
+- Décision de Marc (23/10/2026) : LIA « présente tout le temps ». `app/layout.tsx` rend `<LiaDemarrage />` sans condition de session ; `lib/lia/monter.ts` (`liaAutorisee`) est retiré, et le layout ne lit plus la session. Sans session, `POST /api/lia/ask` reste derrière le proxy (401) : LIA répond « indisponible », aucune donnée n'est exposée.
+- Mesuré en local sur le build de production (Chromium, session fictive) : 2 canvas LIA sur `/login` sans session, sur `/tendances` avec session et sur une 404 avec session. Verrous : `tests/lia.monter.test.ts` et `tests/liaMouvement.test.ts`.
+- Limite connue : `app/global-error.tsx` remplace le gabarit racine ; ce cas (erreur du layout lui-même) n'est pas mesuré.
 
 ## 24/10 — LIA : lia-ui v0.32.0 (CarAI#147)
 

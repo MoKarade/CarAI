@@ -18,7 +18,7 @@ navigateur ──POST /api/lia/ask──▶ app ──POST /api/lia/ask (x-hub-t
 | `lib/lia/demander.ts` | Appel serveur vers le hub : https, jeton en en-tête, délai 35 s, échec fermé |
 | `app/api/lia/ask/route.ts` | Route derrière le proxy ET `requireSession()` ; corps ≤ 8 Ko ; 401 / 400 / 413 / 503 |
 | `lib/lia/client.ts` | Le `ask` du navigateur : parle à la route de l'app, jamais au hub |
-| `lib/lia/monter.ts` + `components/LiaDemarrage.tsx` | LIA n'est démarrée que pour une session admise (pas sur `/login`) : le layout ne rend `LiaDemarrage` que dans ce cas, et le module appelle `demarrerLia` à son chargement |
+| `components/LiaDemarrage.tsx` | LIA est démarrée sur TOUTES les pages, `/login` comprise (Marc, 23/10/2026 : présente tout le temps) : le layout rend `LiaDemarrage` sans condition de session, et le module appelle `demarrerLia` à son chargement. Sans session, la question reçoit 401 de la route et LIA dit « indisponible » |
 
 ## Règles
 
@@ -28,6 +28,6 @@ navigateur ──POST /api/lia/ask──▶ app ──POST /api/lia/ask (x-hub-t
 - **Texte reçu du hub = donnée** : validé par Zod, affiché par `textContent` (jamais `innerHTML`).
 - **v1 : texte, puces et humeur seulement.** Les blocs composés (`blocks`) sont strippés ; l'app n'a pas de rendu pour eux.
 - **Pas d'actions** dans le menu du clic droit en v1 : LIA propose, le hub exécute (catalogue : `hub-contract#78`).
-- **Une seule LIA par page, une seule voie** : `demarrerLia` (`@mokarade/lia-ui/boot`), au chargement du module `LiaDemarrage`, jamais dans un effet ; jamais `<Lia>` en plus. Elle reste là pendant un chargement ou si une page plante. Routes sans LIA : les routes d'API et, en principe, celles où `liaAutorisee()` est faux ; mesuré le 24/10/2026 en local, `/login` sans session affiche pourtant LIA (le chunk du module est évalué sans rendu, CarAI#132), sans exposer de donnée : `/api/lia/ask` reste derrière le proxy et la production redirige `/login` vers le hub.
+- **Une seule LIA par page, une seule voie** : `demarrerLia` (`@mokarade/lia-ui/boot`), au chargement du module `LiaDemarrage`, jamais dans un effet ; jamais `<Lia>` en plus. Elle reste là pendant un chargement ou si une page plante. Pas de LIA sur les routes d'API (pas de page) ; partout ailleurs elle est là, `/login` comprise (CarAI#132, mesuré le 24/10/2026 en local : 2 canvas LIA sans session comme avec session). Sans session, `/api/lia/ask` reste derrière le proxy (401) : aucune donnée exposée.
 - L'URL est `NEXT_PUBLIC_HUB_URL` (déjà utilisée par `accesHub.ts`, défaut `https://hubperso.com`) ; `http:` est refusé.
 - ⚠️ Un fork avec une **CSP** doit autoriser les styles que le paquet injecte (`style-src`), sinon LIA s'affiche sans habillage.
