@@ -10,6 +10,10 @@
 - Mesuré en local sur le build de production (Chromium, session fictive) : 2 canvas LIA sur `/login` sans session, sur `/tendances` avec session et sur une 404 avec session. Verrous : `tests/lia.monter.test.ts` et `tests/liaMouvement.test.ts`.
 - Limite connue : `app/global-error.tsx` remplace le gabarit racine ; ce cas (erreur du layout lui-même) n'est pas mesuré.
 
+## 24/10 — LIA : lia-ui v0.37.2 (CarAI#153)
+
+- `@mokarade/lia-ui` passe de v0.32.0 à **v0.37.2** (tag, commit `5ab9a08`) : plus de carré ni de scène pendant l'analyse (seuls les 100 nanobots travaillent), popup à côté de l'élément, chat plus grand et plus discret, réponses plus courtes. Aucun changement de code. Vérifier après le déploiement : `/login` répond 200.
+
 ## 24/10 — LIA : lia-ui v0.32.0 (CarAI#147)
 
 - `@mokarade/lia-ui` passe de v0.28.0 à **v0.32.0** (tag, commit `09781a…`) : nanobots, pensée, pause et souvenirs, portés par le paquet ; aucun changement de code : `demarrerLia` et `ask` gardent leur signature. `/login` répond 200 (relu en local sur le build de la PR et en production après déploiement).
