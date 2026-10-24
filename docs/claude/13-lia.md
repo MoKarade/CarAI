@@ -2,7 +2,7 @@
 
 LIA, l'assistant de Marc, vit chez **MemoryAI** (cerveau, mémoire, outils). Chaque app ne fait que
 l'afficher et lui relayer les questions **par le hub**, seul détenteur des jetons (MemoryAI ne détient aucun jeton d'app). Le corps (traits en canvas, vie propre, chat au clic,
-menu au clic droit) vient du paquet `@mokarade/lia-ui`, épinglé **par tag** (`github:MoKarade/lia-ui#v0.16.0`),
+menu au clic droit) vient du paquet `@mokarade/lia-ui`, épinglé **par tag** (`github:MoKarade/lia-ui#v0.23.1`),
 jamais par branche, jamais publié sur npm. Mise à jour = changer le tag, comme `hub-contract`.
 
 ## Chemin d'une question
@@ -28,6 +28,6 @@ navigateur ──POST /api/lia/ask──▶ app ──POST /api/lia/ask (x-hub-t
 - **Texte reçu du hub = donnée** : validé par Zod, affiché par `textContent` (jamais `innerHTML`).
 - **v1 : texte, puces et humeur seulement.** Les blocs composés (`blocks`) sont strippés ; l'app n'a pas de rendu pour eux.
 - **Pas d'actions** dans le menu du clic droit en v1 : LIA propose, le hub exécute (catalogue : `hub-contract#78`).
-- **Une seule LIA par page, une seule voie** : `demarrerLia` (`@mokarade/lia-ui/boot`), au chargement du module `LiaDemarrage`, jamais dans un effet ; jamais `<Lia>` en plus. Elle reste là pendant un chargement ou si une page plante. Routes sans LIA : celles où `liaAutorisee()` est faux (non connecté ou refusé, dont `/login`) et les routes d'API.
+- **Une seule LIA par page, une seule voie** : `demarrerLia` (`@mokarade/lia-ui/boot`), au chargement du module `LiaDemarrage`, jamais dans un effet ; jamais `<Lia>` en plus. Elle reste là pendant un chargement ou si une page plante. Routes sans LIA : les routes d'API et, en principe, celles où `liaAutorisee()` est faux ; mesuré le 24/10/2026 en local, `/login` sans session affiche pourtant LIA (le chunk du module est évalué sans rendu, CarAI#132), sans exposer de donnée : `/api/lia/ask` reste derrière le proxy et la production redirige `/login` vers le hub.
 - L'URL est `NEXT_PUBLIC_HUB_URL` (déjà utilisée par `accesHub.ts`, défaut `https://hubperso.com`) ; `http:` est refusé.
 - ⚠️ Un fork avec une **CSP** doit autoriser les styles que le paquet injecte (`style-src`), sinon LIA s'affiche sans habillage.
