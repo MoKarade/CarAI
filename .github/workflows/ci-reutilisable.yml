@@ -51,7 +51,7 @@ jobs:
     name: portes
     # runner auto-hébergé : dépôt PRIVÉ seulement (jamais de code de PR sur un runner auto-hébergé d'un dépôt public), comme le gabarit d'armement
     if: ${{ !inputs.lourds && (github.event.repository.private == true || !contains(inputs.runner, 'self-hosted')) }}
-    runs-on: ${{ fromJSON(inputs.runner) }}
+    runs-on: ${{ github.event.repository.visibility == 'public' && 'ubuntu-latest' || fromJSON(inputs.runner) }} # dépôt public : machines GitHub (gratuites) ; privé : le runner demandé
     # Plafond : sans lui un job figé tourne six heures avant d'échouer.
     timeout-minutes: 15
     steps:
@@ -93,7 +93,7 @@ jobs:
   lourds:
     name: lourds
     if: ${{ inputs.lourds && inputs.commande-lourds != '' && (github.event.repository.private == true || !contains(inputs.runner, 'self-hosted')) }}
-    runs-on: ${{ fromJSON(inputs.runner) }}
+    runs-on: ${{ github.event.repository.visibility == 'public' && 'ubuntu-latest' || fromJSON(inputs.runner) }} # dépôt public : machines GitHub (gratuites) ; privé : le runner demandé
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

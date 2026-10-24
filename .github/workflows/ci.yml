@@ -249,6 +249,29 @@ jobs:
             --config p/typescript --config p/react --config p/nextjs \
             --config p/secrets --config p/owasp-top-ten .
 
+  # Contrôles communs de MoKarade/.github (plan de standardisation du 15/10/2026, décisions 1 et 13).
+  # `securite-commune` s'ajoute au job `securite` sans le remplacer : le renommer changerait le contrôle
+  # « Sécurité (secrets · analyse statique) » que .mergify.yml exige. Elle apporte OSV-Scanner et CodeQL.
+  securite-commune:
+    name: Sécurité commune
+    if: github.event_name != 'schedule'
+    uses: MoKarade/.github/.github/workflows/securite.yml@main
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+
+  # Grille de conformité : le tableau s'écrit dans le résumé du job. `bloquant: false` tant qu'une ligne
+  # reste rouge : la ligne 6 attend deux réglages GitHub de Marc (scan de secrets, protection au push,
+  # CarAI#135) et la ligne 11 la réduction de BACKLOG.md (CarAI#138) ; passer à `true` quand toute la
+  # grille est verte.
+  conformite:
+    name: Conformité
+    if: github.event_name != 'schedule'
+    uses: MoKarade/.github/.github/workflows/conformite.yml@main
+    with:
+      bloquant: false
+
 # ── Au fork ───────────────────────────────────────────────────────────────────
 # Rien à changer pour démarrer : ce fichier fonctionne tel quel. Quand l'app aura un
 # moteur, ajouter ses vérifications au job `gate` (jamais dans un job à part : ce qui
