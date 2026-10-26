@@ -4,6 +4,10 @@
 
 **Dernière mise à jour** : 2026-10-26 · branche `claude/lia-etat-partage`
 
+## 26/10 — LIA : lia-ui v0.42.0, la hauteur de la bulle se révèle en douceur (CarAI#184)
+
+CarAI épingle `@mokarade/lia-ui` v0.42.0 (sha pelé `cff04f4`), seul changement (`package.json`, lock). La bulle de v0.41.1 restait dans l'écran mais changeait de hauteur d'un coup à chaque réponse. v0.42.0 découvre la hauteur gagnée en 280 ms depuis le bord fixe, sans ombre coupée, et ne bouge rien avec `prefers-reduced-motion`. Rien à brancher côté app. Preuve : déploiement Vercel de production `READY` sur le commit fusionné, bundle servi contenant `inset(-24px)` sur carai.hubperso.com, puis mesure sur la page de connexion publique ; la tâche reste ouverte jusque-là.
+
 ## 26/10 — LIA : lia-ui v0.41.1, la bulle ne dépasse plus de l'écran (CarAI#178)
 
 CarAI épingle `@mokarade/lia-ui` v0.41.1 (sha pelé `90dc7e7`), seul changement (`package.json`, lock). Le relevé du PC sur v0.41.0 montrait la bulle hors écran à l'ouverture et à l'arrivée de la réponse, puis un saut. v0.41.1 place sans glisser quand la taille ou l'écran change et fait grandir la bulle vers le haut quand elle est dans la moitié basse. Rien à brancher côté app. Preuve : déploiement Vercel de production `READY` sur le commit fusionné, bundle servi contenant `lia-ui__chat--glisse` sur carai.hubperso.com, puis relevé du PC ; la tâche reste ouverte jusque-là.
