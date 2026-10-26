@@ -17,7 +17,7 @@ Règle : ajouter ou accélérer un cron = mettre ce tableau à jour dans la mêm
 
 ## Crons autorisés
 - `auto-merge.yml` : une fois par jour (`23 9 * * *`), sortie immédiate s'il n'y a aucune PR ouverte. La spec autorise au plus un passage toutes les 6 h ; on ne monte pas (chaque passage coûte au moins une minute).
-- `ci.yml` : audit hebdomadaire (`0 12 * * 1`).
+- `ci.yml` : audit hebdomadaire (`17 12 * * 1`).
 - `smartcar-poll.yml` : `*/15 * * * *` (collecte fonctionnelle). NON modifié par cette PR : décision de Marc en attente.
 - `toyota-poll.yml` : lancement manuel seulement (cron en commentaire).
 

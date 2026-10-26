@@ -16,7 +16,7 @@ on:
   # Le cron ne sert qu'au job `audit` : une vulnérabilité paraît sans qu'une ligne
   # n'ait changé. Lundi 12 h UTC.
   schedule:
-    - cron: "0 12 * * 1"
+    - cron: "17 12 * * 1"
   workflow_dispatch:
 
 # Un run périmé d'une PR est annulé ; un push sur main (fusion) n'est JAMAIS annulé. Aucun `paths:` : un check requis filtré ne tournerait pas.
