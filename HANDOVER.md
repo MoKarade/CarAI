@@ -10,6 +10,10 @@
 - Mesuré en local sur le build de production (Chromium, session fictive) : 2 canvas LIA sur `/login` sans session, sur `/tendances` avec session et sur une 404 avec session. Verrous : `tests/lia.monter.test.ts` et `tests/liaMouvement.test.ts`.
 - Limite connue : `app/global-error.tsx` remplace le gabarit racine ; ce cas (erreur du layout lui-même) n'est pas mesuré.
 
+## 26/10 — LIA : lia-ui remis à v0.38.0 (CarAI#167)
+
+- Dependabot (#162, fusionnée le 26/10 à 07:33Z) avait rétrogradé `@mokarade/lia-ui` de v0.38.0 à **v0.31.0** : il lit mal les tags, comme pour `@mokarade/hub-contract`. Re-pin à **v0.38.0** (commit `9faf1ac`, package.json et lockfile) et `@mokarade/lia-ui` ajouté aux `ignore` de `.github/dependabot.yml` : le re-pin se fait à la main à chaque version. Aucun changement de code. À vérifier après le déploiement : `/login` répond 200.
+
 ## 24/10 — LIA : lia-ui v0.38.0 (CarAI#157)
 
 - `@mokarade/lia-ui` passe de v0.37.2 à **v0.38.0** (tag, commit `9faf1ac`) : quand LIA analyse un élément, ses 100 nanobots dessinent eux-mêmes l'animation d'analyse (quatre coins, ligne qui balaie, points qui s'allument) sur l'élément. Aucun changement de code. Vérifier après le déploiement : `/login` répond 200.
