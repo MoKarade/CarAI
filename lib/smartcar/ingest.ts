@@ -17,6 +17,7 @@ import {
 } from "@/lib/db/schema";
 import { signauxVersSnapshots } from "./signals";
 import { etatDesSignaux } from "@/lib/vehicle/analyse";
+import { publierSorties } from "@/lib/sortiesMemoryAI";
 
 /**
  * Insère des snapshots en ignorant les doublons.
@@ -36,7 +37,17 @@ export async function insererSnapshots(lignes: NouveauSnapshot[]): Promise<numbe
     .insert(vehicleSnapshots)
     .values(lignes)
     .onConflictDoNothing()
-    .returning({ id: vehicleSnapshots.id });
+    .returning({
+      id: vehicleSnapshots.id,
+      source: vehicleSnapshots.source,
+      metricType: vehicleSnapshots.metricType,
+      recordedAt: vehicleSnapshots.recordedAt,
+      valueNumeric: vehicleSnapshots.valueNumeric,
+      valueText: vehicleSnapshots.valueText,
+      valueJson: vehicleSnapshots.valueJson,
+      unit: vehicleSnapshots.unit,
+    });
+  if (inserees.length > 0) void publierSorties(inserees);
   return inserees.length;
 }
 

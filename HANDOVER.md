@@ -4,6 +4,13 @@
 
 **Dernière mise à jour** : 2026-10-26 · branche `claude/lia-etat-partage`
 
+## 26/10 — Sorties CarAI vers MemoryAI (CarAI#174)
+
+- Après une écriture Smartcar ou Toyota réussie, CarAI prépare en arrière-plan les trajets terminés, recharges terminées et changements notables d’état ; `recordedAt` et la source sont conservés. Les sorties ne contiennent ni coordonnées ni adresse. Sans `MEMORYAI_SORTIES_TOKEN`, aucun envoi n’est tenté. `MEMORYAI_URL` est facultative (défaut : `https://memoryai.hubperso.com`) ; le jeton et l’URL restent côté serveur.
+- L’envoi `POST /api/sorties` est borné à 1,5 s et ne bloque pas l’écriture. Les échecs ne remontent pas à la collecte ; le journal serveur ne contient ni jeton ni corps de réponse.
+- Verrous : `tests/sortiesMemoryAI.test.ts`. Preuve de production attendue après la pose du jeton par le fil Secrets : une recharge apparaît dans MemoryAI avec source et date, puis `memoryai_chercher` la retrouve. Tant que le jeton n’est pas posé : `preuve-attendue`.
+- Tâche : MoKarade/CarAI#174.
+
 ## 26/10 — LIA : lia-ui v0.42.0, la hauteur de la bulle se révèle en douceur (CarAI#184)
 
 CarAI épingle `@mokarade/lia-ui` v0.42.0 (sha pelé `cff04f4`), seul changement (`package.json`, lock). La bulle de v0.41.1 restait dans l'écran mais changeait de hauteur d'un coup à chaque réponse. v0.42.0 découvre la hauteur gagnée en 280 ms depuis le bord fixe, sans ombre coupée, et ne bouge rien avec `prefers-reduced-motion`. Rien à brancher côté app. Preuve : déploiement Vercel de production `READY` sur le commit fusionné, bundle servi contenant `inset(-24px)` sur carai.hubperso.com, puis mesure sur la page de connexion publique ; la tâche reste ouverte jusque-là.
