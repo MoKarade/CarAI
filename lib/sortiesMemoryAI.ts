@@ -29,6 +29,8 @@ interface MesureDeclencheuse {
 
 const DELAI_MS = 1_500;
 const FENETRE_JOURS = 400;
+const FENETRE_RECONSTITUTION_JOURS = 3;
+const LIMITE_RECONSTITUTION = 5_000;
 const METRIQUES_ETAT = new Set([
   "battery_soc",
   "charging_status",
@@ -73,8 +75,9 @@ async function lireOdometres(depuis: Date): Promise<Array<{ km: number; mesureLe
         gte(vehicleSnapshots.recordedAt, depuis),
       ),
     )
-    .orderBy(vehicleSnapshots.recordedAt)
-    .limit(50_000);
+    .orderBy(desc(vehicleSnapshots.recordedAt))
+    .limit(LIMITE_RECONSTITUTION);
+  lignes.reverse();
   return filtrerOdometreMonotone(
     lignes.map((l) => ({
       km: l.km!,
@@ -214,9 +217,9 @@ async function evenementsEtat(mesures: MesureDeclencheuse[]): Promise<EvenementS
 async function evenementsTrajets(mesures: MesureDeclencheuse[]): Promise<EvenementSortie[]> {
   const declencheurs = mesures.filter((m) => m.metricType === "location");
   if (declencheurs.length === 0) return [];
-  const depuis = new Date(Date.now() - (FENETRE_JOURS + 1) * 86_400_000);
+  const depuis = new Date(Date.now() - FENETRE_RECONSTITUTION_JOURS * 86_400_000);
   const [positions, historique] = await Promise.all([
-    historiquePositions({ depuis, limite: 50_000 }),
+    historiquePositions({ depuis, limite: LIMITE_RECONSTITUTION }),
     lireOdometres(depuis),
   ]);
   const trajets = decouperTrajets(positions, { historiqueOdometre: historique });
@@ -230,7 +233,7 @@ async function evenementsTrajets(mesures: MesureDeclencheuse[]): Promise<Eveneme
 async function evenementsRecharges(mesures: MesureDeclencheuse[]): Promise<EvenementSortie[]> {
   const declencheurs = mesures.filter((m) => m.metricType === "battery_soc");
   if (declencheurs.length === 0) return [];
-  const depuis = new Date(Date.now() - (FENETRE_JOURS + 1) * 86_400_000);
+  const depuis = new Date(Date.now() - FENETRE_RECONSTITUTION_JOURS * 86_400_000);
   const [lignes, odometres] = await Promise.all([
     db
       .select({
@@ -247,9 +250,11 @@ async function evenementsRecharges(mesures: MesureDeclencheuse[]): Promise<Evene
           gte(vehicleSnapshots.recordedAt, depuis),
         ),
       )
-      .orderBy(vehicleSnapshots.recordedAt),
+      .orderBy(desc(vehicleSnapshots.recordedAt))
+      .limit(LIMITE_RECONSTITUTION),
     lireOdometres(depuis),
   ]);
+  lignes.reverse();
   const evenements: EvenementSortie[] = [];
   for (const source of [...new Set(declencheurs.map((m) => m.source))]) {
     const socs = lignes
