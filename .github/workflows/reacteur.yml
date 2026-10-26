@@ -24,8 +24,8 @@ on:
     types: [closed]
   schedule:
     # Filet quotidien à 6 h au Québec : 10 h UTC en heure d'été, 11 h UTC en heure d'hiver. Le script n'agit qu'à 6 h locale.
-    - cron: '0 10 * * *'
-    - cron: '0 11 * * *'
+    - cron: '11 10 * * *'
+    - cron: '11 11 * * *'
   workflow_dispatch:
 
 permissions: {}
