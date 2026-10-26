@@ -4,6 +4,10 @@
 
 **Dernière mise à jour** : 2026-10-26 · branche `claude/lia-etat-partage`
 
+## 26/10 — LIA : lia-ui v0.41.0, sources cliquables et chat en bulle lissée (CarAI#175)
+
+CarAI épingle `@mokarade/lia-ui` v0.41.0 (sha pelé `4d0c6f9`), seul changement (`package.json`, lock). v0.40.0 : les marques `[→lien]` d'une réponse de LIA deviennent une ligne « Sources » de petits liens (https, sans identifiants). v0.41.0 : le chat ne se replace plus à chaque image, reste dans l'écran visible (clavier du téléphone compris), glisse vers sa place, ne bouge pas quand le texte arrive. Retours de Marc du 26/10 : « incompréhensible, trop de texte, pas de liens » et « clunky, ça bug quand ça sort de la page ». Rien à brancher côté app. Preuve : déploiement Vercel de production `READY` sur le commit fusionné, bundle servi contenant `lia-ui__sources` et `lia-ui__chat--glisse` sur carai.hubperso.com, puis une réponse réelle de LIA ; la tâche reste ouverte jusque-là.
+
 ## 26/10 — LIA partage son état unique avec le hub (CarAI#166)
 
 - Avant : CarAI démarrait LIA sans l'option `etat` ; humeur, envies et discussion restaient locales au navigateur, donc différentes du hub (constaté : la discussion repartait à zéro d'une app à l'autre). Marc, 23/10 : « une seule LIA, un seul état ».
