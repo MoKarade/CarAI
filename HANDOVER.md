@@ -2,7 +2,14 @@
 
 > À lire en premier à chaque reprise de session.
 
-**Dernière mise à jour** : 2026-10-24 · branche `claude/lia-toujours`
+**Dernière mise à jour** : 2026-10-26 · branche `claude/lia-etat-partage`
+
+## 26/10 — LIA partage son état unique avec le hub (CarAI#166)
+
+- Avant : CarAI démarrait LIA sans l'option `etat` ; humeur, envies et discussion restaient locales au navigateur, donc différentes du hub (constaté : la discussion repartait à zéro d'une app à l'autre). Marc, 23/10 : « une seule LIA, un seul état ».
+- Maintenant : `GET|PUT /api/lia/etat` (`app/api/lia/etat/route.ts`), derrière le proxy ET `requireSession()`, relaie `/api/lia/etat` du hub avec le cookie de session de l'utilisateur (jamais `HUB_TOKEN`), comme BatchChef. `LiaDemarrage` passe `etat: etatHttp("/api/lia/etat")` dans le navigateur. Sans session, hub injoignable ou réponse hors contrat : 401 / 503 et LIA garde son état local. Même pin que le hub : lia-ui v0.39.0 (la discussion suit Marc, `validerEtat` ne la retire plus). Détail : `docs/claude/13-lia.md`.
+- Verrous : `tests/lia.etat.test.ts` (jugement, relais, route, discussion), `tests/lia.hubCookie.test.ts` (le cookie survit à la redirection apex → www), `tests/auth.test.ts` (la route reste gardée). Preuve en production : `GET /api/lia/etat` rend l'état du hub avec la session de Marc ; la tâche reste ouverte jusque-là.
+
 
 ## 24/10 — LIA présente sur toutes les pages, `/login` comprise (CarAI#132)
 

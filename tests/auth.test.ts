@@ -199,6 +199,9 @@ describe("alignement matcher ↔ isPublicPath", () => {
       "/api/lia/ask",
       "/api/lia/askX",
       "/api/lia/ask/x",
+      "/api/lia/etat",
+      "/api/lia/etatX",
+      "/api/lia/etat/x",
     ])("%s reste GARDÉ", (chemin) => {
       expect(gardee(chemin)).toBe(true);
     });
