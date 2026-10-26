@@ -24,3 +24,4 @@ jobs:
     with:
       url-base: https://carai.hubperso.com
       chemin-summary: ""
+    secrets: inherit
