@@ -5,10 +5,9 @@
 // QUOI QUE CE SOIT D'AUTRE. Aucune exception ne remonte à l'appelant — elles sont
 // attrapées, comptées, journalisées, et transformées en résultat.
 
-import { db } from "@/lib/db";
-import { vehicleSnapshots } from "@/lib/db/schema";
 import { lireSanteToyota, ecrireSanteToyota } from "@/lib/config";
 import { signauxVersSnapshots } from "@/lib/smartcar/signals";
+import { insererSnapshots } from "@/lib/smartcar/ingest";
 import { credentialsToyota, creerClientToyota } from "./client";
 import {
   apresEchec,
@@ -121,12 +120,7 @@ export async function executerCycleToyota(params: {
 
     let ecrits = 0;
     if (lignes.length > 0) {
-      const inserees = await db
-        .insert(vehicleSnapshots)
-        .values(lignes)
-        .onConflictDoNothing()
-        .returning({ id: vehicleSnapshots.id });
-      ecrits = inserees.length;
+      ecrits = await insererSnapshots(lignes);
     }
 
     const odometre = lignes.find((l) => l.metricType === "odometer")?.valueNumeric ?? null;

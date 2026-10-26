@@ -130,7 +130,7 @@ export async function rejouerLivraisons(params: {
     for (const snap of snapshots) {
       vuesParMetrique[snap.metricType] = (vuesParMetrique[snap.metricType] ?? 0) + 1;
     }
-    mesuresRestaurees += await insererSnapshots(snapshots);
+    mesuresRestaurees += await insererSnapshots(snapshots, { publier: false });
   }
 
   return {

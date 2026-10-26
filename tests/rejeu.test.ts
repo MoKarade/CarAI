@@ -119,6 +119,11 @@ describe("le rejeu date les mesures de la livraison D'ORIGINE, jamais d'aujourd'
       /recuLe: new Date\(\)/,
     );
   });
+
+  it("réécrit les snapshots sans publier de sorties externes", () => {
+    const source = readFileSync("lib/smartcar/rejeu.ts", "utf8");
+    expect(source).toMatch(/insererSnapshots\(snapshots,\s*\{\s*publier:\s*false\s*\}\)/);
+  });
 });
 
 describe("la reconstruction est AUTOMATIQUE — plus rien à cliquer (Marc, 18/08)", () => {
