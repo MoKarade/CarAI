@@ -7,7 +7,7 @@
 ## 26/10 — Sorties CarAI vers MemoryAI (CarAI#174)
 
 - Après une écriture Smartcar ou Toyota réussie, CarAI prépare en arrière-plan les trajets terminés, recharges terminées et changements notables d’état ; `recordedAt` et la source sont conservés. Les sorties ne contiennent ni coordonnées ni adresse. Sans `MEMORYAI_SORTIES_TOKEN`, aucun envoi n’est tenté. `MEMORYAI_URL` est facultative (défaut : `https://memoryai.hubperso.com`) ; le jeton et l’URL restent côté serveur.
-- L’envoi `POST /api/sorties` est borné à 1,5 s et ne bloque pas l’écriture. Les échecs ne remontent pas à la collecte ; le journal serveur ne contient ni jeton ni corps de réponse.
+- L’envoi `POST /api/sorties` est attendu par `insererSnapshots` (une fonction Vercel ne survit pas à sa réponse) mais borné : 1,5 s par requête, 4 s pour l’ensemble préparation et envoi. Les échecs ne remontent pas à la collecte ; le journal serveur ne contient ni jeton ni corps de réponse. Les trajets et recharges se reconstituent sur les 3 derniers jours (5 000 lignes au plus), jamais sur 400 jours ; un rejeu (`lib/smartcar/rejeu.ts`) ne publie rien.
 - Verrous : `tests/sortiesMemoryAI.test.ts`. Preuve de production attendue après la pose du jeton par le fil Secrets : une recharge apparaît dans MemoryAI avec source et date, puis `memoryai_chercher` la retrouve. Tant que le jeton n’est pas posé : `preuve-attendue`.
 - Tâche : MoKarade/CarAI#174.
 
