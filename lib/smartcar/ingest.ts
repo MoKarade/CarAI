@@ -17,6 +17,9 @@ import {
 } from "@/lib/db/schema";
 import { signauxVersSnapshots } from "./signals";
 import { etatDesSignaux } from "@/lib/vehicle/analyse";
+import { publierSorties } from "@/lib/sortiesMemoryAI";
+
+const BUDGET_PUBLICATION_SORTIES_MS = 4_000;
 
 /**
  * Insère des snapshots en ignorant les doublons.
@@ -30,13 +33,43 @@ import { etatDesSignaux } from "@/lib/vehicle/analyse";
  * cas normal quand la voiture n'a pas bougé depuis la dernière livraison. Cette distinction
  * compte — elle empêche de lire « 0 écrit » comme une panne.
  */
-export async function insererSnapshots(lignes: NouveauSnapshot[]): Promise<number> {
+export async function insererSnapshots(
+  lignes: NouveauSnapshot[],
+  options: { publier?: boolean } = {},
+): Promise<number> {
   if (lignes.length === 0) return 0;
   const inserees = await db
     .insert(vehicleSnapshots)
     .values(lignes)
     .onConflictDoNothing()
-    .returning({ id: vehicleSnapshots.id });
+    .returning({
+      id: vehicleSnapshots.id,
+      source: vehicleSnapshots.source,
+      metricType: vehicleSnapshots.metricType,
+      recordedAt: vehicleSnapshots.recordedAt,
+      valueNumeric: vehicleSnapshots.valueNumeric,
+      valueText: vehicleSnapshots.valueText,
+      valueJson: vehicleSnapshots.valueJson,
+      unit: vehicleSnapshots.unit,
+    });
+  if (options.publier !== false && inserees.length > 0) {
+    let delai: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        publierSorties(inserees),
+        new Promise<void>((resolve) => {
+          delai = setTimeout(() => {
+            console.warn("[memoryai-sorties] budget global dépassé (4 s)");
+            resolve();
+          }, BUDGET_PUBLICATION_SORTIES_MS);
+        }),
+      ]);
+    } catch {
+      console.warn("[memoryai-sorties] échec de publication");
+    } finally {
+      if (delai) clearTimeout(delai);
+    }
+  }
   return inserees.length;
 }
 
