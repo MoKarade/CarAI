@@ -11,6 +11,10 @@
 - Verrous : `tests/sortiesMemoryAI.test.ts`. Preuve de production attendue après la pose du jeton par le fil Secrets : une recharge apparaît dans MemoryAI avec source et date, puis `memoryai_chercher` la retrouve. Tant que le jeton n’est pas posé : `preuve-attendue`.
 - Tâche : MoKarade/CarAI#174.
 
+## 27/10 — LIA : lia-ui v0.42.1, la discussion la plus récente l'emporte (CarAI#195)
+
+CarAI épingle `@mokarade/lia-ui` v0.42.1 (sha pelé `b8967ec`), seul changement (`package.json`, lock). Au montage, la discussion de l'onglet était datée « maintenant » et passait devant celle de l'état partagé : une question posée sur le hub ne se retrouvait pas dans CarAI. v0.42.1 range le vrai instant avec la discussion de l'onglet, et la plus récente gagne à la première lecture de l'état. Rien à brancher côté app. Preuve : déploiement Vercel de production `READY` sur le commit fusionné, puis relevé du PC (lia-ui#140).
+
 ## 26/10 — LIA : lia-ui v0.42.0, la hauteur de la bulle se révèle en douceur (CarAI#184)
 
 CarAI épingle `@mokarade/lia-ui` v0.42.0 (sha pelé `cff04f4`), seul changement (`package.json`, lock). La bulle de v0.41.1 restait dans l'écran mais changeait de hauteur d'un coup à chaque réponse. v0.42.0 découvre la hauteur gagnée en 280 ms depuis le bord fixe, sans ombre coupée, et ne bouge rien avec `prefers-reduced-motion`. Rien à brancher côté app. Preuve : déploiement Vercel de production `READY` sur le commit fusionné, bundle servi contenant `inset(-24px)` sur carai.hubperso.com, puis mesure sur la page de connexion publique ; la tâche reste ouverte jusque-là.
