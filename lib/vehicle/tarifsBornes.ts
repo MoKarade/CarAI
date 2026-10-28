@@ -323,8 +323,9 @@ export function prixSession(params: {
       // ⚠️ UN MAJORANT MULTIPLIÉ PAR UN TARIF NE DONNE PAS UNE MESURE (Marc, 17/09).
       // Une borne horaire facture le temps BRANCHÉ ; quand les bornes de la session sont
       // des fenêtres de sondage, ce temps est un majorant — donc le montant aussi. Le
-      // présenter en `mesure` lui donnait l'habillage d'un prix relevé : sur la session
-      // du 17/09, « 1,00 $/h sur 3 h 52 » affichait 3,86 $ pour une charge qui a duré ce
+      // présenter en `mesure` lui donnait l'habillage d'un prix relevé : sur une session
+      // type, un tarif horaire sur une fenêtre de sondage (exemple fictif : « 2,00 $/h sur
+      // 2 h 30 », soit 5,00 $) s'affichait en « mesure » pour une charge qui a duré ce
       // qu'elle a duré, et personne ne pouvait le savoir en lisant l'écran.
       // Le montant RESTE affiché — un trou dans un cumul coûte plus cher qu'un chiffre
       // dont on dit la valeur — mais il dit ce qu'il est : un plafond.
