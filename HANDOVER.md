@@ -11,6 +11,10 @@
 - Verrous : `tests/sortiesMemoryAI.test.ts`. Preuve de production attendue après la pose du jeton par le fil Secrets : une recharge apparaît dans MemoryAI avec source et date, puis `memoryai_chercher` la retrouve. Tant que le jeton n’est pas posé : `preuve-attendue`.
 - Tâche : MoKarade/CarAI#174.
 
+## 28/10 — LIA : lia-ui v0.42.2, une discussion fermée ailleurs reste fermée (CarAI#198)
+
+CarAI épingle `@mokarade/lia-ui` v0.42.2 (sha pelé `9852596`), seul changement (`package.json`, lock). v0.42.1 ne rapprochait la discussion de l'onglet de celle de l'état partagé qu'à la première lecture, et seulement si la partagée était ouverte : une discussion fermée sur le hub était réécrasée par celle, plus ancienne, d'un onglet. v0.42.2 rapproche à chaque lecture (la plus récente gagne, fermée ailleurs = fermée ici) et écrit toujours la plus récente des deux. Rien à brancher côté app. Preuve : déploiement Vercel de production `READY` sur le commit fusionné, puis relevé du PC (lia-ui#144).
+
 ## 27/10 — LIA : lia-ui v0.42.1, la discussion la plus récente l'emporte (CarAI#195)
 
 CarAI épingle `@mokarade/lia-ui` v0.42.1 (sha pelé `b8967ec`), seul changement (`package.json`, lock). Au montage, la discussion de l'onglet était datée « maintenant » et passait devant celle de l'état partagé : une question posée sur le hub ne se retrouvait pas dans CarAI. v0.42.1 range le vrai instant avec la discussion de l'onglet, et la plus récente gagne à la première lecture de l'état. Rien à brancher côté app. Preuve : déploiement Vercel de production `READY` sur le commit fusionné, puis relevé du PC (lia-ui#140).
