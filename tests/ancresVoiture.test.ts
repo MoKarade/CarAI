@@ -91,12 +91,10 @@ describe("chaque marqueur est POSÉ sur la carrosserie", () => {
     expect(vus.size).toBe(elements.length);
   });
 
-  it("⚠️ le côté conducteur est une HYPOTHÈSE, et le code le dit", () => {
-    // Tant que personne n'a regardé l'écran, gauche et droite ne sont pas garanties :
-    // afficher « avant-gauche » sur la roue de droite serait une donnée juste posée au
-    // mauvais endroit. Ce test tombera le jour où on passera le drapeau à `true` — c'est
-    // exactement à ce moment-là qu'il faut relire ce qui en dépend.
-    expect(COTE_VERIFIE).toBe(false);
+  it("le côté conducteur est confirmé à l'œil (Marc, 28/10/2026) : plus de réserve à l'écran", () => {
+    // Si le modèle 3D change de repère, ce test tombe avec le drapeau : c'est le moment de relire
+    // ce qui en dépend et de redemander un coup d'œil.
+    expect(COTE_VERIFIE).toBe(true);
   });
 });
 
