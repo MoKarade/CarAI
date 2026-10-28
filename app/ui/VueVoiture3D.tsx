@@ -68,9 +68,9 @@ export function VueVoiture3D({ points }: { points: readonly PointVoiture[] }) {
 
           <Voiture3D points={points} />
 
-          {/* ⚠️ Tant que personne n'a confirmé quel côté du modèle est la gauche, l'écran le
-              DIT. Afficher « avant-gauche » sur la roue de droite serait une mesure juste
-              posée au mauvais endroit — donc un chiffre faux, en pire : il a l'air placé. */}
+          {/* Réserve affichée seulement si le côté du modèle n'est pas confirmé (`COTE_VERIFIE`) :
+              afficher « avant-gauche » sur la roue de droite serait une mesure juste posée au
+              mauvais endroit. Confirmé par Marc le 28/10/2026, donc masquée. */}
           {!COTE_VERIFIE && (
             <p className="v3d-reserve">
               Gauche et droite ne sont pas encore confirmées sur ce modèle : une pression est
