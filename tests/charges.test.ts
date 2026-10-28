@@ -203,24 +203,24 @@ describe("chargesDepuisSoc", () => {
 });
 
 describe("chargesDepuisSoc — un PALIER n'est pas une fin de charge", () => {
-  // ⚠️ Ces relevés ne sont pas inventés : ce sont les états de charge RÉELS de la nuit du
-  // 17/09/2026, relus depuis la base. L'écran en tirait TROIS recharges — 79→84, 84→87,
-  // 87→90 — pour une seule nuit où le câble n'avait pas bougé. C'est ce que Marc voyait
-  // quand il disait « c'est vraiment pas fiable, pas assez précis ».
-  const NUIT_DU_17 = [
-    { h: 0, m: 26, soc: 79 },
-    { h: 3, m: 36, soc: 84 },
-    { h: 4, m: 26, soc: 84 }, // palier de 50 min
-    { h: 6, m: 51, soc: 87 },
-    { h: 7, m: 36, soc: 87 }, // palier de 45 min
-    { h: 10, m: 6, soc: 90 },
-  ].map(({ h, m, soc }) => ({ t: new Date(Date.UTC(2026, 8, 17, h, m, 0)), pourcent: soc }));
+  // ⚠️ Relevés FICTIFS (règle du dépôt : aucun relevé réel dans un fichier versionné), mais
+  // de la même forme qu'une vraie nuit branchée : l'écran en tirait TROIS recharges — 40→45,
+  // 45→48, 48→52 — pour une seule nuit où le câble n'avait pas bougé. C'est ce que Marc
+  // voyait quand il disait « c'est vraiment pas fiable, pas assez précis ».
+  const NUIT_TYPE = [
+    { h: 0, m: 10, soc: 40 },
+    { h: 3, m: 20, soc: 45 },
+    { h: 4, m: 5, soc: 45 }, // palier de 45 min
+    { h: 6, m: 30, soc: 48 },
+    { h: 7, m: 10, soc: 48 }, // palier de 40 min
+    { h: 9, m: 40, soc: 52 },
+  ].map(({ h, m, soc }) => ({ t: new Date(Date.UTC(2026, 0, 10, h, m, 0)), pourcent: soc }));
 
   it("recolle une nuit branchée en UNE session", () => {
-    const sessions = chargesDepuisSoc({ socs: NUIT_DU_17 });
+    const sessions = chargesDepuisSoc({ socs: NUIT_TYPE });
     expect(sessions).toHaveLength(1);
-    expect(sessions[0]!.socDebut).toBe(79);
-    expect(sessions[0]!.socFin).toBe(90);
+    expect(sessions[0]!.socDebut).toBe(40);
+    expect(sessions[0]!.socFin).toBe(52);
   });
 
   // ⚠️ Le contrôle qui compte vraiment : un palier se TRAVERSE, il ne s'ACCUMULE pas. Une
