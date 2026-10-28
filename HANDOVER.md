@@ -2,7 +2,12 @@
 
 > À lire en premier à chaque reprise de session.
 
-**Dernière mise à jour** : 2026-10-28 · branche `claude/lia-ui-0-47-0`
+**Dernière mise à jour** : 2026-10-28 · branche `claude/robot-pc-14`
+
+## 28/10 — CarAI#14 : le robot du PC ne sert plus aucun workflow
+
+- `ci.yml` et `sentry-essai.yml` : `runs-on: ubuntu-latest` ; `graphe.yml`, `reacteur.yml` et `ci-reutilisable.yml` passent `"ubuntu-latest"` comme runner. Plus aucune mention de `self-hosted` ni de `pc-marc` dans `.github/`, sauf une ligne inerte de `garde-fou.yml` (fichier protégé : le garde-fou refuse qu'une PR le modifie seule, la condition de visibilité y choisit `ubuntu-latest` tant que le dépôt est public). Verrou : `tests/robotPcRetire.test.ts`, qui parcourt tous les workflows.
+- `CLAUDE.md` : la section « CI (dépôt privé) » devient « CI (dépôt public) ». Si le dépôt redevenait privé, rouvrir ce choix avant tout push (un job sur `ubuntu-latest` d'un dépôt privé échoue : facturation GitHub).
 
 ## 28/10/2026 : lia-ui v0.47.0, LIA lit les graphiques et ne scanne que sur demande (CarAI#221, mission MoKarade/.github#575)
 
@@ -240,7 +245,7 @@ déclare l'hôte d'envoi `https://*.ingest.us.sentry.io` (organisation `mokarade
   (décision de Marc du 16/10, « on laisse »). Tant qu'il ne l'est pas, les déploiements Vercel n'envoient rien à Sentry.
 - **Preuve de la chaîne** : workflow manuel « Essai Sentry » (Actions > Essai Sentry > Run workflow, ou `npm run sentry:essai` avec
   `SENTRY_DSN` dans l'environnement) : il lit le secret `SENTRY_DSN` du dépôt, envoie une erreur volontaire par les MÊMES réglages que
-  l'app et échoue si Sentry ne répond pas 2xx. Il tourne sur le robot du PC (dépôt privé).
+  l'app et échoue si Sentry ne répond pas 2xx. Il tourne sur les machines GitHub (CarAI#14).
 - Pour allumer la production : poser `SENTRY_DSN` dans Vercel (geste soumis à l'accord de Marc), redéployer, déclencher une erreur.
 
 ## 28/10 — Contrat hub v1.6.0 (CarAI#208)

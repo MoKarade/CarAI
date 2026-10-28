@@ -16,5 +16,5 @@ jobs:
       contents: read
     uses: MoKarade/.github/.github/workflows/graphe.yml@main
     with:
-      runner: ${{ github.event.repository.visibility == 'public' && '"ubuntu-latest"' || '["self-hosted","pc-marc"]' }}
+      runner: '"ubuntu-latest"'
       depot: ${{ github.repository }}
