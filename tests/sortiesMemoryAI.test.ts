@@ -36,6 +36,26 @@ describe("événements de sortie MemoryAI", () => {
     expect(JSON.stringify(evenement)).not.toMatch(/latitude|longitude|coordonn|adresse/i);
   });
 
+  it("ne dit jamais « 0 min » : une durée nulle avec une distance devient « durée inconnue »", () => {
+    const evenement = creerEvenementTrajet(
+      {
+        debut: DATE,
+        fin: DATE,
+        dureeMinutes: 0,
+        dureeEstFenetre: false,
+        distanceKm: 80,
+        distanceEstimee: true,
+      },
+      MESURE,
+    );
+
+    expect(evenement).toMatchObject({
+      titre: "Trajet terminé · 80 km",
+      resume: "durée inconnue · distance estimée · Smartcar.",
+    });
+    expect(evenement?.resume).not.toMatch(/(^|\s)0 min/);
+  });
+
   it("crée une recharge terminée avec durée et pourcentage", () => {
     const evenement = creerEvenementRecharge(
       {
