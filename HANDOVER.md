@@ -2,7 +2,11 @@
 
 > À lire en premier à chaque reprise de session.
 
-**Dernière mise à jour** : 2026-10-26 · branche `claude/lia-etat-partage`
+**Dernière mise à jour** : 2026-10-28 · branche `claude/lia-ui-0-47-0`
+
+## 28/10/2026 : lia-ui v0.47.0, LIA lit les graphiques et ne scanne que sur demande (CarAI#221, mission MoKarade/.github#575)
+
+Épingle `@mokarade/lia-ui` v0.47.0 (sha pelé `7f1d7bb`), seul changement (`package.json`, lock). Marc, 28/10/2026 : « l'assistant voit toujours pas les graphes » et « l'animation de scan uniquement sur ce que je lui ai demandé ». v0.47.0 : LIA lit un graphique SVG (titre, axes, légende, infobulles, valeurs écrites) sans code chez l'app ; les graphiques dessinés sur un `<canvas>` restent illisibles (limite connue). v0.46.0 : le scan des nanobots ne joue que sur ce que Marc a demandé d'analyser. v0.45.x et v0.44.x arrivent avec (menu du clic droit sur sa propre couche). Rien à brancher. Preuve : déploiement `READY` sur le commit fusionné, puis relevé du PC (question sur un graphique de CarAI : la réponse cite les libellés écrits).
 
 ## 28/10/2026 : le clic droit de LIA marche sous chaque carte Google (CarAI#218, mission MoKarade/.github#575)
 
