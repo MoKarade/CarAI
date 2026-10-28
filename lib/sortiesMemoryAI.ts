@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { vehicleSnapshots, type Source } from "@/lib/db/schema";
 import { historiquePositions } from "@/lib/vehicle/position";
 import { filtrerOdometreMonotone } from "@/lib/vehicle/history";
-import { decouperTrajets } from "@/lib/vehicle/trajets";
+import { decouperTrajets, libelleDuree } from "@/lib/vehicle/trajets";
 import { chargesDepuisSoc } from "@/lib/vehicle/charges";
 import { interpreterPourcentage } from "@/lib/smartcar/signals";
 
@@ -106,13 +106,12 @@ export function creerEvenementTrajet(
     return null;
   }
   const date = mesure.recordedAt;
-  const duree = Math.round(trajet.dureeMinutes);
   const distance = Math.round(trajet.distanceKm * 10) / 10;
   return {
     type: "trajet",
     date: date.toISOString(),
     titre: `Trajet terminé · ${distance} km`,
-    resume: `${duree} min${trajet.dureeEstFenetre ? " (fenêtre estimée)" : ""} · ${
+    resume: `${libelleDuree(trajet.dureeMinutes)}${trajet.dureeEstFenetre ? " (fenêtre estimée)" : ""} · ${
       trajet.distanceEstimee ? "distance estimée" : "odomètre"
     } · ${nomSource(mesure.source)}.`,
     ref: refMesure(mesure.id, "trajet"),

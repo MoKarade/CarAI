@@ -918,6 +918,17 @@ export function jugerConcordance(bilan: Reconciliation): VerdictConcordance {
     : { genre: "surplus", ...commun, ecartKm: Math.abs(ecart) };
 }
 
+/**
+ * Durée d'un trajet pour l'affichage : une durée nulle, négative ou non finie
+ * (deux relevés du même instant) est « durée inconnue », jamais « 0 min » ;
+ * sous la minute : « < 1 min ».
+ */
+export function libelleDuree(minutes: number): string {
+  if (!Number.isFinite(minutes) || minutes <= 0) return "durée inconnue";
+  if (minutes < 0.5) return "< 1 min";
+  return formaterDuree(minutes);
+}
+
 /** Durée en clair : « 1 h 12 » plutôt que « 72 minutes ». */
 export function formaterDuree(minutes: number): string {
   const total = Math.round(minutes);
