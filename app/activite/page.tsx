@@ -78,6 +78,7 @@ import { nommerLieuRecharge } from "@/app/activite/actions";
 import { FormulaireNommerLieu } from "@/app/activite/FormulaireNommerLieu";
 import { cleGeo, cleGeocodage, nommerPoints } from "@/lib/geocodage";
 import { CarteInteractive } from "@/app/ui/CarteInteractive";
+import { BandeauCarte } from "@/app/ui/BandeauCarte";
 import { CarteGoogleItineraire, cleMapsEmbed } from "@/app/ui/CarteGoogle";
 import { CarteGoogleVivante } from "@/app/ui/CarteGoogleVivante";
 import { InfoTap, Pastille, Pastilles } from "@/app/ui/Pastille";
@@ -1099,13 +1100,13 @@ export default async function Activite({
               trajets={tousLesTrajets.map((t) => t.points.map((p) => ({ lat: p.lat, lng: p.lng })))}
               cle={cleGoogle}
               legende={
-                <p className="hint">
+                <BandeauCarte genre="la ligne sous la carte de tous les trajets">
                   {totalTrajets} trajet{totalTrajets > 1 ? "s" : ""} · {km(totalKm)} (
                   {fenetre.libelle.toLowerCase()}) — chaque trait relie les{" "}
                   <strong>relevés réels</strong> d’un trajet ; la route exacte entre deux
                   relevés n’est pas enregistrée (la bZ ne publie sa position qu’à l’arrêt).
                   Ctrl/⌘ + molette pour zoomer, glisser pour se déplacer.
-                </p>
+                </BandeauCarte>
               }
             >
               <CarteInteractive
