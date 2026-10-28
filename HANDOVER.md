@@ -231,6 +231,15 @@ déclare l'hôte d'envoi `https://*.ingest.us.sentry.io` (organisation `mokarade
   l'app et échoue si Sentry ne répond pas 2xx. Il tourne sur le robot du PC (dépôt privé).
 - Pour allumer la production : poser `SENTRY_DSN` dans Vercel (geste soumis à l'accord de Marc), redéployer, déclencher une erreur.
 
+## 28/10 — Contrat hub v1.6.0 (CarAI#208)
+
+`@mokarade/hub-contract` passe de `#v1.5.0` à `#v1.6.0` (commit `df97e9f`, tag posé le 26/10/2026 par le PC). La v1.6.0 est
+additive : elle ajoute le catalogue d'actions de l'assistant (`validateActionCatalog`) ; `validateSummary` et le format de
+`/hub/summary` sont inchangés (README et HANDOVER de hub-contract). Cause : la ligne 7 de la grille de conformité disait
+ROUGE (« contrat hub v1.5.0, dernier tag v1.6.0 », lue le 28/10). Le lockfile ne change que les trois lignes du contrat
+(version, `resolved`, spécification) : un `npm install` local en npm 10 réécrit aussi des champs `libc` et `dev`, bruit
+écarté exprès.
+
 ## 16/10 — Contrat hub v1.5.0 (zod 4) (CarAI#289)
 
 `@mokarade/hub-contract` passe de `#v1.4.0` à `#v1.5.0` (commit `440a301`, hub-contract#56) : le contrat est en zod 4, donc
