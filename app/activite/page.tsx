@@ -22,6 +22,7 @@ import { historiquePositions, formaterCoordonnee } from "@/lib/vehicle/position"
 import {
   decouperTrajets,
   formaterDuree,
+  libelleDuree,
   lienArrivee,
   lienItineraire,
   profilerReleves,
@@ -257,7 +258,7 @@ function LigneTrajet({
       <span className="duree">
         {departPrecis(t) ? (
           <>
-            {formaterDuree(t.dureeMinutes)}
+            {libelleDuree(t.dureeMinutes)}
             {t.dureeEstFenetre ? (
               <span
                 className="approx"
@@ -1171,7 +1172,7 @@ export default async function Activite({
                   {trajetAffiche.distanceEstimee ? " min." : ""}
                 </Pastille>
                 {departPrecis(trajetAffiche) && (
-                  <Pastille ton="neutre">{formaterDuree(trajetAffiche.dureeMinutes)}</Pastille>
+                  <Pastille ton="neutre">{libelleDuree(trajetAffiche.dureeMinutes)}</Pastille>
                 )}
                 {detail?.kwh != null && (
                   <Pastille ton="estime">~{detail.kwh.toFixed(1)} kWh</Pastille>

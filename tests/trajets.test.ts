@@ -29,6 +29,7 @@ import {
   formaterDuree,
   grouperParJour,
   instantDuTrajet,
+  libelleDuree,
   lienItineraire,
   longueurDuChemin,
   odometreALinstant,
@@ -613,6 +614,16 @@ describe("longueurDuChemin et formaterDuree", () => {
     expect(formaterDuree(60)).toBe("1 h");
     expect(formaterDuree(72)).toBe("1 h 12");
     expect(formaterDuree(125)).toBe("2 h 05");
+  });
+
+  it("dit « durée inconnue » plutôt que « 0 min » quand la durée n'est pas mesurée", () => {
+    expect(libelleDuree(35)).toBe("35 min");
+    expect(libelleDuree(72)).toBe("1 h 12");
+    expect(libelleDuree(0)).toBe("durée inconnue");
+    expect(libelleDuree(-3)).toBe("durée inconnue");
+    expect(libelleDuree(Number.NaN)).toBe("durée inconnue");
+    expect(libelleDuree(0.2)).toBe("< 1 min");
+    expect(libelleDuree(0.2)).not.toContain("0 min");
   });
 });
 
