@@ -21,6 +21,7 @@
 // Sans clé configurée (`GOOGLE_MAPS_EMBED_KEY` absente), les appelants gardent la carte
 // OSM existante : l'app ne casse jamais parce qu'une variable manque — elle dégrade.
 
+import { BandeauCarte } from "@/app/ui/BandeauCarte";
 import { planifierItineraire } from "@/lib/itineraire";
 
 /** `null` si la clé n'est pas configurée — l'appelant bascule alors sur la carte OSM. */
@@ -112,11 +113,11 @@ export function CarteGoogleItineraire({
           allowFullScreen
           referrerPolicy="strict-origin"
         />
-        <p className="hint">
+        <BandeauCarte genre="la ligne sous la carte de l'endroit d'un trajet">
           Départ et arrivée au même endroit, sans relevé éloigné entre les deux : il n’y a
           pas d’itinéraire à tracer — voici l’endroit du trajet. (La bZ ne publie sa
           position qu’à l’arrêt.)
-        </p>
+        </BandeauCarte>
       </>
     );
   }
@@ -141,13 +142,13 @@ export function CarteGoogleItineraire({
         allowFullScreen
         referrerPolicy="strict-origin"
       />
-      <p className="hint">
+      <BandeauCarte genre="la ligne sous la carte de l'itinéraire d'un trajet">
         Itinéraire <strong>reconstitué par Google</strong> en passant par{" "}
         {passages === points.length
           ? `les ${points.length} relevés réels`
           : `${passages} des ${points.length} relevés réels`}{" "}
         — la route exacte n’est pas enregistrée (la bZ ne publie sa position qu’à l’arrêt).
-      </p>
+      </BandeauCarte>
     </>
   );
 }

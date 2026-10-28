@@ -80,6 +80,10 @@ export function InfoTap({ resume, children }: { resume?: string; children: React
 }
 
 /** Une rangée de pastilles sous un chiffre ou un titre — l'unité de mise en page. */
-export function Pastilles({ children }: { children: ReactNode }) {
-  return <div className="insignes">{children}</div>;
+export function Pastilles({ children, genre }: { children: ReactNode; genre?: string }) {
+  return (
+    <div className="insignes" data-lia-genre={genre}>
+      {children}
+    </div>
+  );
 }
