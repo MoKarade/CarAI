@@ -113,8 +113,8 @@ describe("prixSession", () => {
 
   // ⚠️ Une borne HORAIRE multiplie une DURÉE. Quand cette durée est la fenêtre entre deux
   // relevés — le cas de TOUTE session déduite du SOC, donc de toutes aujourd'hui — le
-  // montant est un plafond, pas un relevé. Chiffre réel du 17/09 : « 1,00 $/h sur 3 h 52 »
-  // affichait 3,86 $ en qualité « mesure » sur une charge dont personne ne connaît la
+  // montant est un plafond, pas un relevé. Exemple fictif : « 2,00 $/h sur 2 h 30 » (5,00 $)
+  // s'affichait en qualité « mesure » sur une charge dont personne ne connaît la
   // durée vraie.
   it("une borne HORAIRE sur des bornes ESTIMÉES rend un plafond, pas une mesure", () => {
     const p = prixSession({
