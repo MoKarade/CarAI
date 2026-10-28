@@ -177,8 +177,8 @@ export const CORRESPONDANCE_EXACTE: Readonly<Record<string, MetricType>> = {
  *
  * ⚠️ **Un statut de poll est un INSTANTANÉ, jamais un verdict.** Un signal peut sortir
  * `ERROR (COMPATIBILITY)` d'un poll et être parfaitement confirmé : `charge-timetocomplete`
- * ne répond que PENDANT une charge (vu le 17/09/2026 en erreur, avec 569 valeurs en base et
- * une livraison moins de deux heures plus tôt). Ce qui prouve la stabilité est l'HISTORIQUE :
+ * ne répond que PENDANT une charge (vu le 17/09/2026 en erreur, alors que des centaines de valeurs étaient
+ * en base et qu'une livraison datait de moins de deux heures). Ce qui prouve la stabilité est l'HISTORIQUE :
  * un signal qui a livré des valeurs pendant des semaines SANS jamais être inscrit en refus.
  * `filtrerRepetitions` n'écrit une ligne sans valeur que sur un CHANGEMENT de statut, donc
  * `nbMesures == nbValeurs` dans `inventaire_donnees` veut dire « ce signal n'a jamais été

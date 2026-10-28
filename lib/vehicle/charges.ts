@@ -160,8 +160,8 @@ export const KM_MAX_PENDANT_CHARGE = 0.5;
  *
  * ⚠️ UN PALIER N'EST PAS UNE FIN DE CHARGE (Marc, 17/09 : « pas assez précis »). Jusqu'ici
  * cette boucle clôturait la session dès qu'un relevé ne montait PAS — donc une seule nuit
- * branchée ressortait en trois recharges. Mesuré sur les données réelles du 17/09 : 79→84,
- * 84→87, 87→90, bornes jointives au point près, alors que le câble n'avait pas bougé. Le
+ * branchée ressortait en trois recharges. Forme observée sur une vraie nuit (valeurs fictives ici) : 40→45,
+ * 45→48, 48→52, bornes jointives au point près, alors que le câble n'avait pas bougé. Le
  * SOC stagne pour des raisons ordinaires — arrondi du capteur, palier de fin de charge,
  * équilibrage — et `TROU_MINUTES` existait déjà pour ça… mais n'était appliqué QUE sur le
  * chemin `etatsCharge`, qui est mort (la bZ ne sert pas `charge-ischarging`). Une tolérance
