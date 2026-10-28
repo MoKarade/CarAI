@@ -25,7 +25,9 @@ jobs:
     timeout-minutes: 20
     name: Lire /tendances avec une session d'essai
     if: github.event.repository.visibility == 'public'
-    runs-on: ubuntu-latest
+    # ubuntu-24.04 et non ubuntu-latest : latest est passé à 26.04, où Playwright 1.56.1 refuse
+    # d'installer Chromium (CarAI#212). À remettre sur latest quand Playwright la supportera.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
