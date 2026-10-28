@@ -21,12 +21,12 @@
     "restaurer:sauvegarde": "node scripts/restaurer-sauvegarde.mjs"
   },
   "//migrations": "Les migrations s'appliquent au DÉMARRAGE de l'app (lib/migrations.ts), PAS via un script vercel-build. Choix du Doc 1 §4.1 : CarAI a des tâches de fond (webhooks Smartcar, poll Toyota) qui doivent pouvoir réparer le schéma sans redéploiement. Exigence de Marc : ne JAMAIS avoir à lancer une commande sur son PC. `db:generate` produit le SQL au moment du développement ; personne ne l'applique à la main.",
-  "//hub-contract": "Épinglé sur le TAG v1.5.0 (16/10/2026). Le contrat passe à zod 4 (hub-contract#56) : un seul zod 4 dans l'arbre, plus de copie zod 3. Sous-chemin /session (verifierSession, plan auth-asym-hubperso) depuis v1.4.0 ; le contrat /endpoint et /hub/summary n'a pas bougé. Ne JAMAIS redescendre sous v1.3.0 : les clés inconnues sont strippées SANS erreur, donc un pin antérieur ferait disparaître le bloc details et la déclaration de fraîcheur en silence — pas de message, juste un hub qui n'affiche plus rien de tout ça.",
+  "//hub-contract": "Épinglé sur le TAG v1.6.0 (28/10/2026, ajout optionnel du catalogue d'actions de l'assistant, hub-contract#78 : validateSummary inchangé). Depuis v1.5.0 (16/10/2026) le contrat est en zod 4 (hub-contract#56) : un seul zod 4 dans l'arbre, plus de copie zod 3. Sous-chemin /session (verifierSession, plan auth-asym-hubperso) depuis v1.4.0 ; le contrat /endpoint et /hub/summary n'a pas bougé. Ne JAMAIS redescendre sous v1.3.0 : les clés inconnues sont strippées SANS erreur, donc un pin antérieur ferait disparaître le bloc details et la déclaration de fraîcheur en silence — pas de message, juste un hub qui n'affiche plus rien de tout ça.",
   "//jose": "Peer dependency OPTIONNELLE de @mokarade/hub-contract/session (^6.0.0) : requise seulement parce que CarAI importe ce sous-chemin (phase 1 de auth-asym-hubperso). Épinglée en direct plutôt que laissée en transitive de next-auth, qui n'en garantit pas la version.",
   "//drizzle-orm": "Plancher de sécurité, jamais redescendu : >= 0.45.2 ferme GHSA-gpj5-g38j-94v9 (injection SQL par identifiants mal échappés, HIGH). Même plancher que BatchChef et JobAI.",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",
-    "@mokarade/hub-contract": "github:MoKarade/hub-contract#v1.5.0",
+    "@mokarade/hub-contract": "github:MoKarade/hub-contract#v1.6.0",
     "@mokarade/lia-ui": "github:MoKarade/lia-ui#v0.42.2",
     "@neondatabase/serverless": "^1.2.0",
     "@sentry/nextjs": "^11.9.0",
