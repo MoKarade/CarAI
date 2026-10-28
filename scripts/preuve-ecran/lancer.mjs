@@ -97,7 +97,9 @@ try {
   const contexte = await navigateur.newContext({ viewport: { width: 1280, height: 1600 }, locale: "fr-CA" });
   await contexte.addCookies([{ name: COOKIE, value: jeton, url: ORIGINE }]);
   const page = await contexte.newPage();
-  const reponse = await page.goto(`${ORIGINE}/tendances`, { waitUntil: "networkidle" });
+  // « domcontentloaded », pas « networkidle » ni « load » : LIA (montée sur toutes les pages) garde une requête ouverte vers le hub, injoignable ici.
+  // Chaque contrôle attend ensuite SON élément (`waitForSelector`), donc rien n'est affaibli.
+  const reponse = await page.goto(`${ORIGINE}/tendances`, { waitUntil: "domcontentloaded" });
   verifie("avec la session d'essai, /tendances répond 200", reponse?.status() === 200, { statut: reponse?.status(), url: page.url() });
 
   await page.waitForSelector("h2", { timeout: 30_000 });
@@ -157,7 +159,7 @@ try {
           nommable: Boolean(e.querySelector(".nommer-lieu > summary")),
         })),
       );
-    await page.goto(`${ORIGINE}/activite?periode=7j`, { waitUntil: "networkidle" });
+    await page.goto(`${ORIGINE}/activite?periode=7j`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector("li.ev-recharge", { timeout: 30_000 });
     const avant = await lignesRecharge();
     await page.screenshot({ path: resolve(sortie, "preuve-activite-avant.png"), fullPage: true });
@@ -189,7 +191,7 @@ try {
     );
     verifie("le geste aboutit sans refus : la ligne porte le nom sans recharger la page (CarAI#8)", refus.length === 0, refus);
 
-    await page.goto(`${ORIGINE}/activite?periode=7j`, { waitUntil: "networkidle" });
+    await page.goto(`${ORIGINE}/activite?periode=7j`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector("li.ev-recharge", { timeout: 30_000 });
     const apres = await lignesRecharge();
     await page.screenshot({ path: resolve(sortie, "preuve-activite-apres.png"), fullPage: true });
@@ -204,7 +206,8 @@ try {
       apres.map((l) => l.prix),
     );
 
-    await page.goto(`${ORIGINE}/reglages`, { waitUntil: "networkidle" });
+    await page.goto(`${ORIGINE}/reglages`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector(".liste-lieux li", { timeout: 30_000 });
     const lieuxReglages = await page.$$eval(".liste-lieux li", (els) =>
       els.map((e) => (e.textContent ?? "").replace(/\s+/g, " ").trim()),
     );
