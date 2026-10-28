@@ -38,8 +38,8 @@
 - Coûts (minutes Actions, quota, appels IA) : `docs/couts.md`. Rattachement : `docs/rattachement.md`.
 - Graphe de code (hooks et MCP `graphify` posés, 0 jeton ; `scripts/graphe.sh query|affected|path|explain` avant de grepper ; wiki : `graphify-out/wiki/index.md`) : `docs/claude/12-graphe-code.md`.
 
-## CI (dépôt privé)
-Les jobs déclenchés par une PR choisissent leur machine selon la visibilité du dépôt : privé, robot de tests du PC de Marc (`[self-hosted, pc-marc]`) ; public, machines GitHub (gratuites). Un robot du PC ne doit jamais servir une PR d'un dépôt public. `smartcar-poll.yml` (planifié) tourne toujours sur les machines GitHub (`ubuntu-latest`), jamais sur le PC.
+## CI (dépôt public)
+Tous les workflows tournent sur les machines GitHub (`ubuntu-latest`, gratuites) ; aucun ne vise le robot du PC de Marc (`self-hosted`, `pc-marc`), verrou `tests/robotPcRetire.test.ts` (CarAI#14). Si le dépôt redevenait privé, il faudrait rouvrir ce choix avant tout push.
 
 ## Compte-rendu
 Règles de forme : instructions du projet « Apps ». Copie lisible à la demande dans `docs/COMPTE-RENDU.md` (non chargée à chaque session ; sa synchro reste vérifiée par la CI).

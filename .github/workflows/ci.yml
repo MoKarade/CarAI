@@ -34,7 +34,7 @@ jobs:
     timeout-minutes: 15
     name: Gate (typecheck · lint · tests · build)
     if: github.event_name != 'schedule'
-    runs-on: ${{ github.event.repository.visibility == 'public' && 'ubuntu-latest' || fromJSON('["self-hosted","pc-marc"]') }} # dépôt public : machines GitHub (gratuites) ; privé : robot du PC
+    runs-on: ubuntu-latest # dépôt public : machines GitHub (gratuites)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -111,7 +111,7 @@ jobs:
     # DriveAI le 19/08/2026). Calibre sur la duree reelle — 27 s observe.
     timeout-minutes: 10
     name: Audit des dépendances de production
-    runs-on: ${{ github.event.repository.visibility == 'public' && 'ubuntu-latest' || fromJSON('["self-hosted","pc-marc"]') }} # dépôt public : machines GitHub (gratuites) ; privé : robot du PC
+    runs-on: ubuntu-latest # dépôt public : machines GitHub (gratuites)
     # Job SÉPARÉ du gate, volontairement : un avis de sécurité paraît sans qu'aucun
     # commit n'ait eu lieu. Mêlé au gate, il peindrait un dépôt sain en rouge du jour
     # au lendemain, et on prendrait l'habitude du rouge — c'est exactement ainsi
@@ -165,7 +165,7 @@ jobs:
     name: Qualité (lint · couverture · code mort · architecture)
     # Le cron ne concerne que l'audit : inutile de rejouer ce job sur un code inchangé.
     if: github.event_name != 'schedule'
-    runs-on: ${{ github.event.repository.visibility == 'public' && 'ubuntu-latest' || fromJSON('["self-hosted","pc-marc"]') }} # dépôt public : machines GitHub (gratuites) ; privé : robot du PC
+    runs-on: ubuntu-latest # dépôt public : machines GitHub (gratuites)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -224,7 +224,7 @@ jobs:
     name: Sécurité (secrets · analyse statique)
     # Le cron ne concerne que l'audit : inutile de rejouer ce job sur un code inchangé.
     if: github.event_name != 'schedule'
-    runs-on: ${{ github.event.repository.visibility == 'public' && 'ubuntu-latest' || fromJSON('["self-hosted","pc-marc"]') }} # dépôt public : machines GitHub (gratuites) ; privé : robot du PC
+    runs-on: ubuntu-latest # dépôt public : machines GitHub (gratuites)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
