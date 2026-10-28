@@ -694,8 +694,8 @@ systématiquement, et les retirer de la souscription cesse de payer pour des err
 ### 2. Une nuit branchée s'affichait en trois recharges
 
 `chargesDepuisSoc` clôturait la session dès qu'un relevé ne montait pas. Un palier — arrondi
-du capteur, fin de charge, équilibrage — suffisait à couper. Données réelles du 17/09 :
-79→84, 84→87, 87→90, bornes jointives au point près, pour une seule nuit où le câble n'avait
+du capteur, fin de charge, équilibrage — suffisait à couper. Forme observée le 17/09 (valeurs fictives ici) :
+40→45, 45→48, 48→52, bornes jointives au point près, pour une seule nuit où le câble n'avait
 pas bougé. `TROU_MINUTES` (75 min) existait pour ça mais n'était appliqué que sur le chemin
 `etatsCharge`, celui que la bZ n'alimente pas. Un palier est désormais TRAVERSÉ, jamais
 accumulé : la fin de session reste la dernière montée réelle.
