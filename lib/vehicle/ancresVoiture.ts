@@ -30,14 +30,12 @@
 //     essieux à Y ± 145       empattement 290 cm · bZ4X réelle 285 cm (écart 1,8 %)
 //     rayon de roue 35 cm     soit 70 cm de diamètre · un 235/60R18 en fait 71
 //
-// ⚠️ **CE QUI N'A PAS PU ÊTRE MESURÉ : QUEL CÔTÉ EST LA GAUCHE.** Rien dans le modèle ne
-// lève l'ambiguïté — il faudrait un élément asymétrique (le volant, la trappe de charge),
-// et l'intérieur est fusionné tandis que la trappe n'existe pas comme entité. La convention
-// ci-dessous (`X` négatif = côté conducteur) est donc **UNE HYPOTHÈSE NON VÉRIFIÉE**, pas
-// une mesure. Elle se confirme d'un coup d'œil à l'écran et se corrige en changeant un
-// signe. Tant qu'elle n'est pas confirmée, afficher « avant-gauche » sur la roue de droite
-// serait une donnée juste posée au mauvais endroit — donc un `no-fake-data`, et c'est
-// pourquoi `COTE_VERIFIE` existe et que l'interface doit le dire.
+// **QUEL CÔTÉ EST LA GAUCHE.** Rien dans le modèle ne lève l'ambiguïté (il faudrait un
+// élément asymétrique : le volant, la trappe de charge ; l'intérieur est fusionné et la
+// trappe n'existe pas comme entité). La convention ci-dessous (`X` négatif = côté conducteur)
+// a été posée en hypothèse puis **confirmée à l'œil par Marc le 28/10/2026** : voir
+// `COTE_VERIFIE`. Afficher « avant-gauche » sur la roue de droite serait une donnée juste
+// posée au mauvais endroit — donc un `no-fake-data` —, c'est pourquoi le drapeau existe.
 
 /** Un point du repère du modèle, en centimètres. */
 export interface Ancre3D {
@@ -76,13 +74,14 @@ export const MODELE = {
 } as const;
 
 /**
- * ⚠️ **L'hypothèse du côté conducteur, à confirmer à l'œil.**
+ * **Le côté conducteur est confirmé** : Marc a regardé la vue 3D le 28/10/2026 (réponse « oui »
+ * dans la Tournée à l'écran, Hubperso#137 ligne 6) — les pressions tombent du bon côté, `X`
+ * négatif = côté conducteur est donc une mesure à l'œil, plus une hypothèse.
  *
- * `false` tant que personne n'a regardé l'écran. Ce n'est pas une précaution de style :
- * tant que ça vaut `false`, l'interface doit dire que la gauche et la droite ne sont pas
- * garanties, sinon elle affirme un placement qu'aucune mesure ne soutient.
+ * Le drapeau reste : si le modèle 3D change (autre fichier, autre repère), il faut le repasser
+ * à `false` jusqu'à un nouveau coup d'œil, et l'interface remet alors sa réserve.
  */
-export const COTE_VERIFIE = false;
+export const COTE_VERIFIE = true;
 
 /** Où chaque élément se pose sur la carrosserie. PURE. */
 export const ANCRES: Readonly<Record<ElementVoiture, Ancre3D>> = {
