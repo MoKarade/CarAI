@@ -4,6 +4,10 @@
 
 **Dernière mise à jour** : 2026-10-26 · branche `claude/lia-etat-partage`
 
+## 28/10 : lia-ui v0.43.0, le clic droit de LIA marche partout (CarAI#206, mission MoKarade/.github#575)
+
+Épingle `@mokarade/lia-ui` v0.43.0 (sha pelé `c0f1ff7`), seul changement (`package.json`, lock). Marc, 28/10/2026 : « faut qu'il marche partout ». Le clic droit (et l'appui long) de LIA s'ouvre maintenant sur le fond de page, dans une fenêtre modale `<dialog>.showModal()`, et même quand un gestionnaire de la page bloque le menu natif ; les champs de saisie gardent le menu du navigateur. Rien à brancher. Preuve : déploiement de production `READY` sur le commit fusionné, puis relevé du PC (lia-ui#147).
+
 ## 26/10 — Sorties CarAI vers MemoryAI (CarAI#174)
 
 - Après une écriture Smartcar ou Toyota réussie, CarAI prépare en arrière-plan les trajets terminés, recharges terminées et changements notables d’état ; `recordedAt` et la source sont conservés. Les sorties ne contiennent ni coordonnées ni adresse. Sans `MEMORYAI_SORTIES_TOKEN`, aucun envoi n’est tenté. `MEMORYAI_URL` est facultative (défaut : `https://memoryai.hubperso.com`) ; le jeton et l’URL restent côté serveur.
