@@ -702,7 +702,7 @@ accumulé : la fin de session reste la dernière montée réelle.
 
 ### 3. Un coût facturé à l'heure sur une fenêtre de sondage
 
-« Travail — 1,00 $/h sur 3 h 52 » affichait 3,86 $ en qualité « mesure ». La durée est un
+Un tarif horaire sur une fenêtre de sondage (exemple fictif : « 2,00 $/h sur 2 h 30 », soit 5,00 $) s'affichait en qualité « mesure ». La durée est un
 majorant assumé par le code ; un majorant multiplié par un tarif ne donne pas une mesure. Le
 montant reste affiché — un trou dans un cumul coûte plus cher qu'un chiffre dont on dit la
 valeur — mais il passe en « estimé » et dit qu'il est un plafond. Au kWh, rien n'est dégradé :
