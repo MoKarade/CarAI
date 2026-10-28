@@ -4,12 +4,12 @@ name: Fumée de production
 # le site répond. Le contrôle est le workflow commun de MoKarade/.github (plan de standardisation du
 # 15/10/2026, décision 5) ; ce fichier ne fait que l'appeler.
 #
-# Contrôles (rouge si l'un échoue après 3 essais) : santé (/api/sante), page de connexion (/login).
-# Le journal ne contient ni corps de réponse ni jeton.
-# Le contrôle « summary » est volontairement ABSENT (chemin-summary vide) : il exige le secret HUB_TOKEN du
-# dépôt, qui n'y est pas posé (Vercel ne laisse pas relire la valeur d'un secret masqué). Sans ce secret le
-# contrôle serait rouge à chaque déploiement (« jeton du hub absent »). À rétablir le jour où le secret est
-# posé (CarAI#136) : retirer `chemin-summary: ""` et passer le jeton du hub au workflow commun.
+# Contrôles (rouge si l'un échoue après 3 essais) : santé (/api/sante), summary refusé sans jeton puis
+# valide avec le jeton (/hub/summary), page de connexion (/login). Le journal ne contient ni corps de
+# réponse ni jeton.
+# Le workflow commun reçoit le jeton sous le nom `hub-token` (un nom de secret GitHub ne peut pas porter de
+# tiret, donc `secrets: inherit` ne le remplit jamais) : on le passe explicitement depuis HUB_TOKEN, et
+# HUB_DISPATCH_TOKEN (retour en arrière si la fumée est rouge) de la même façon (CarAI#136).
 on:
   deployment_status:
 
@@ -23,5 +23,6 @@ jobs:
     uses: MoKarade/.github/.github/workflows/fumee.yml@main
     with:
       url-base: https://carai.hubperso.com
-      chemin-summary: ""
-    secrets: inherit
+    secrets:
+      hub-token: ${{ secrets.HUB_TOKEN }}
+      HUB_DISPATCH_TOKEN: ${{ secrets.HUB_DISPATCH_TOKEN }}
