@@ -6,7 +6,7 @@
 
 ## 28/10 — CarAI#14 : le robot du PC ne sert plus aucun workflow
 
-- `ci.yml`, `garde-fou.yml`, `sentry-essai.yml` : `runs-on: ubuntu-latest` ; `graphe.yml`, `reacteur.yml` et `ci-reutilisable.yml` passent `"ubuntu-latest"` comme runner. Plus aucune mention de `self-hosted` ni de `pc-marc` dans `.github/` (le dépôt est public). Verrou : `tests/robotPcRetire.test.ts`, qui parcourt tous les workflows.
+- `ci.yml` et `sentry-essai.yml` : `runs-on: ubuntu-latest` ; `graphe.yml`, `reacteur.yml` et `ci-reutilisable.yml` passent `"ubuntu-latest"` comme runner. Plus aucune mention de `self-hosted` ni de `pc-marc` dans `.github/`, sauf une ligne inerte de `garde-fou.yml` (fichier protégé : le garde-fou refuse qu'une PR le modifie seule, la condition de visibilité y choisit `ubuntu-latest` tant que le dépôt est public). Verrou : `tests/robotPcRetire.test.ts`, qui parcourt tous les workflows.
 - `CLAUDE.md` : la section « CI (dépôt privé) » devient « CI (dépôt public) ». Si le dépôt redevenait privé, rouvrir ce choix avant tout push (un job sur `ubuntu-latest` d'un dépôt privé échoue : facturation GitHub).
 
 ## 28/10/2026 : lia-ui v0.47.0, LIA lit les graphiques et ne scanne que sur demande (CarAI#221, mission MoKarade/.github#575)

@@ -28,7 +28,7 @@ jobs:
     name: Garde-fou
     # Plafond : le contrôle dure quelques secondes ; un job figé ne doit pas tourner six heures.
     timeout-minutes: 5
-    runs-on: ubuntu-latest # dépôt public : machines GitHub (gratuites)
+    runs-on: ${{ github.event.repository.visibility == 'public' && 'ubuntu-latest' || fromJSON('["self-hosted","pc-marc"]') }} # dépôt public : machines GitHub (gratuites) ; privé : robot du PC
     steps:
       - name: Récupérer le script du garde-fou (jamais le code de la PR)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
