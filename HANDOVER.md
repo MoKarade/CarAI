@@ -4,6 +4,11 @@
 
 **Dernière mise à jour** : 2026-10-28 · branche `claude/robot-pc-14`
 
+## 28/10 — CarAI#5 : le côté de la vue 3D est confirmé
+
+- Marc a regardé la vue 3D le 28/10/2026 (Tournée à l'écran, Hubperso#137 ligne 6) : les pressions tombent du bon côté. `COTE_VERIFIE` passe à `true` dans `lib/vehicle/ancresVoiture.ts`, la réserve « Gauche et droite ne sont pas encore confirmées » ne s'affiche plus, aucun signe à corriger. Le test de `tests/ancresVoiture.test.ts` attend maintenant `true`.
+- Si le modèle 3D change de repère, remettre le drapeau à `false` jusqu'à un nouveau coup d'œil.
+
 ## 28/10 — CarAI#14 : le robot du PC ne sert plus aucun workflow
 
 - `ci.yml` et `sentry-essai.yml` : `runs-on: ubuntu-latest` ; `graphe.yml`, `reacteur.yml` et `ci-reutilisable.yml` passent `"ubuntu-latest"` comme runner. Plus aucune mention de `self-hosted` ni de `pc-marc` dans `.github/`, sauf une ligne inerte de `garde-fou.yml` (fichier protégé : le garde-fou refuse qu'une PR le modifie seule, la condition de visibilité y choisit `ubuntu-latest` tant que le dépôt est public). Verrou : `tests/robotPcRetire.test.ts`, qui parcourt tous les workflows.
