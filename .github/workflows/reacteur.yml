@@ -44,7 +44,7 @@ jobs:
     uses: MoKarade/.github/.github/workflows/preuve.yml@main
     with:
       numero: ${{ github.event.issue.number }}
-      runner: ${{ github.event.repository.visibility == 'public' && '"ubuntu-latest"' || '["self-hosted","pc-marc"]' }}
+      runner: '"ubuntu-latest"'
       deploiement: vercel
 
   reveiller:
@@ -72,7 +72,7 @@ jobs:
     uses: MoKarade/.github/.github/workflows/reveil-reacteur.yml@main
     secrets: inherit
     with:
-      runner: ${{ github.event.repository.visibility == 'public' && '"ubuntu-latest"' || '["self-hosted","pc-marc"]' }}
+      runner: '"ubuntu-latest"'
       deploiement: vercel
       type: ${{ github.event_name == 'pull_request' && (github.event.action == 'closed' && 'pr_fusionnee' || 'pr_ouverte') || github.event_name == 'issues' && 'tache_fermee' || github.event_name == 'workflow_run' && (github.event.workflow_run.name == 'Garde-fou' && 'garde_fou_rouge' || 'ci_rouge') || 'filet' }}
       depot: ${{ github.repository }}

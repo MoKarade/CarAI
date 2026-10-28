@@ -38,9 +38,9 @@ on:
         type: boolean
         default: false
       runner:
-        description: "Étiquette du runner (JSON) ; GitHub-hosted par défaut"
+        description: "Étiquette du runner (JSON) ; machines GitHub par défaut"
         type: string
-        default: '["self-hosted", "pc-marc"]'
+        default: '"ubuntu-latest"'
 
 permissions:
   contents: read
@@ -49,9 +49,8 @@ jobs:
   # Le nom `portes` est le CONTRAT du check requis : ne pas le changer.
   portes:
     name: portes
-    # runner auto-hébergé : dépôt PRIVÉ seulement (jamais de code de PR sur un runner auto-hébergé d'un dépôt public), comme le gabarit d'armement
-    if: ${{ !inputs.lourds && (github.event.repository.private == true || !contains(inputs.runner, 'self-hosted')) }}
-    runs-on: ${{ github.event.repository.visibility == 'public' && 'ubuntu-latest' || fromJSON(inputs.runner) }} # dépôt public : machines GitHub (gratuites) ; privé : le runner demandé
+    if: ${{ !inputs.lourds }}
+    runs-on: ${{ fromJSON(inputs.runner) }} # dépôt public : machines GitHub (gratuites), jamais le robot du PC
     # Plafond : sans lui un job figé tourne six heures avant d'échouer.
     timeout-minutes: 15
     steps:
@@ -92,8 +91,8 @@ jobs:
 
   lourds:
     name: lourds
-    if: ${{ inputs.lourds && inputs.commande-lourds != '' && (github.event.repository.private == true || !contains(inputs.runner, 'self-hosted')) }}
-    runs-on: ${{ github.event.repository.visibility == 'public' && 'ubuntu-latest' || fromJSON(inputs.runner) }} # dépôt public : machines GitHub (gratuites) ; privé : le runner demandé
+    if: ${{ inputs.lourds && inputs.commande-lourds != '' }}
+    runs-on: ${{ fromJSON(inputs.runner) }} # dépôt public : machines GitHub (gratuites), jamais le robot du PC
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
