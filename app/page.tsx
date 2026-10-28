@@ -379,7 +379,7 @@ function HerosVoiture({
                   <Carte vue={vueCarte} />
                 </a>
               ) : null}
-              <Pastilles>
+              <Pastilles genre="la ligne sous la carte de la dernière position de la voiture">
                 <Pastille ton="neutre" icone={<IcoPosition taille={13} />}>
                   {position.type?.toUpperCase() === "REAL_TIME" ? "En déplacement" : "Stationnée"}
                 </Pastille>

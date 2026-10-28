@@ -109,6 +109,7 @@ import {
 import { NonAutorise, requireSession } from "@/lib/session";
 import { Onglets } from "@/app/ui/Onglets";
 import { capaciteBatterieKwh } from "@/lib/vehicle/capacite";
+import { BandeauCarte } from "@/app/ui/BandeauCarte";
 import { cleMapsEmbed } from "@/app/ui/CarteGoogle";
 import { CarteGoogleVivante } from "@/app/ui/CarteGoogleVivante";
 import { CarteInteractive } from "@/app/ui/CarteInteractive";
@@ -439,12 +440,12 @@ function Trajet({
   );
 
   const legende = (
-    <p className="hint">
+    <BandeauCarte genre="la ligne sous la carte de la zone parcourue">
       {trace.nbPoints} position(s) sur environ {etendue} — chaque point est un{" "}
       <strong>relevé réel</strong> de position (la bZ ne publie qu’à l’arrêt) ; le point
       marqué est la dernière position. Ctrl/⌘ + molette pour zoomer, glisser pour se
       déplacer.
-    </p>
+    </BandeauCarte>
   );
   const ariaZone = `Zone parcourue, ${trace.nbPoints} positions sur environ ${etendue}.`;
 

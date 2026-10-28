@@ -4,6 +4,10 @@
 
 **Dernière mise à jour** : 2026-10-26 · branche `claude/lia-etat-partage`
 
+## 28/10/2026 : le clic droit de LIA marche sous chaque carte Google (CarAI#218, mission MoKarade/.github#575)
+
+Marc, 28/10/2026 : « bandeau sous la carte ». La carte Google garde son clic droit (iframe d'une autre origine pour l'Embed, API JavaScript pour la carte vivante) : LIA ne peut pas le relayer. La ligne sous chaque carte porte donc celui de LIA : `BandeauCarte` (`app/ui/BandeauCarte.tsx`, `data-lia-genre`) sous l'itinéraire, l'endroit d'un trajet, tous les trajets et la zone parcourue, et `Pastilles genre=…` sous la carte de l'accueil. Aucun texte ni style ajouté : la ligne existait déjà, elle déclare seulement de quelle carte il s'agit. Preuve : déploiement `READY` sur le commit fusionné, puis relevé du PC (clic droit sous la carte de l'accueil et de /trajets).
+
 ## 28/10/2026 : lia-ui v0.44.2, le menu du clic droit s'ouvre toujours sous le clic (CarAI#215, mission MoKarade/.github#575)
 
 Épingle `@mokarade/lia-ui` v0.44.2 (sha pelé `8881751`), seul changement (`package.json`, lock). Le menu d'un élément n'est plus borné à la zone de vie de LIA : il s'ouvre là où Marc a cliqué, dans la fenêtre (lia-ui#152, relevé du PC du 28/10, 15:48Z). v0.44.0 (mode atelier, inactif tant que l'app ne le demande pas) et v0.44.1 (tag automatique) arrivent avec. Limite inchangée : les cartes Google (`app/ui/CarteGoogle.tsx`) sont des `<iframe>` d'une autre origine, le clic droit y reste celui de Google. [À vérifier] relevé du PC après le déploiement de production.
