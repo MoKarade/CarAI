@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { ServiceWorker } from "@/components/ServiceWorker";
 import LiaDemarrage from "@/components/LiaDemarrage";
+import NavApps from "@/components/NavApps";
+import { APP_COURANTE, navAppsAutorisee } from "@/lib/navAppsMonter";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -34,10 +36,13 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Onglet « Apps » : propriétaire seul, jamais sur /login ni sans session (échec fermé).
+  const navApps = await navAppsAutorisee();
   return (
     <html lang="fr-CA">
       <body>
+        {navApps && <NavApps courant={APP_COURANTE} />}
         {children}
         <ServiceWorker />
         {/* LIA sans condition de session (Marc, 23/10/2026 : présente tout le temps). Sans session, sa
