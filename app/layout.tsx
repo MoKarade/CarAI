@@ -1,3 +1,4 @@
+// Mise en ligne de l’onglet « Apps » (CarAI#258) : ce commentaire force un build, la production servait encore e5bff78.
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { ServiceWorker } from "@/components/ServiceWorker";
