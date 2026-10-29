@@ -60,6 +60,9 @@ export function BoutonMaintenir({
       disabled={occupe}
       onPointerDown={(e) => {
         e.preventDefault();
+        // ⚠️ Seul le bouton principal (ou un toucher) arme le geste : un clic droit ouvre le menu de
+        // LIA, il ne doit jamais compter comme un appui qui envoie une commande ou supprime.
+        if (e.button !== 0) return;
         commencer();
       }}
       onPointerUp={annuler}

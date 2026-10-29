@@ -14,6 +14,10 @@
 - `ci.yml` et `sentry-essai.yml` : `runs-on: ubuntu-latest` ; `graphe.yml`, `reacteur.yml` et `ci-reutilisable.yml` passent `"ubuntu-latest"` comme runner. Plus aucune mention de `self-hosted` ni de `pc-marc` dans `.github/`, sauf une ligne inerte de `garde-fou.yml` (fichier protégé : le garde-fou refuse qu'une PR le modifie seule, la condition de visibilité y choisit `ubuntu-latest` tant que le dépôt est public). Verrou : `tests/robotPcRetire.test.ts`, qui parcourt tous les workflows.
 - `CLAUDE.md` : la section « CI (dépôt privé) » devient « CI (dépôt public) ». Si le dépôt redevenait privé, rouvrir ce choix avant tout push (un job sur `ubuntu-latest` d'un dépôt privé échoue : facturation GitHub).
 
+## 29/10/2026 : le bouton à maintenir ignore le clic droit (CarAI#245, mission CarAI#12)
+
+`BoutonMaintenir` démarrait son minuteur de 800 ms sur n'importe quel `pointerdown`, clic droit compris : un clic droit (menu de LIA) sur un bouton de commande au véhicule ou de purge pouvait armer le geste. Seul le bouton principal (ou un toucher) l'arme maintenant (`e.button !== 0` : retour). Test de source dans `tests/refonte.test.ts`. Trouvé en préparant la preuve de CarAI#206.
+
 ## 29/10/2026 : lia-ui v0.48.2, la discussion de LIA survit à l'inactivité (CarAI#242, mission MoKarade/.github#719)
 
 Épingle `@mokarade/lia-ui` v0.48.2 (sha pelé `524f7b1`), seul changement (`package.json`, lock). v0.48.1 (lia-ui#166) : la discussion ne se ferme plus et ne s'efface plus après 2 minutes sans geste ; elle survit à un rechargement et au passage d'une app à l'autre. v0.48.2 (lia-ui#168) : toucher le corps de LIA cache le chat sans effacer la discussion ; seuls ✕ et Échap l'effacent. Rien à brancher. Preuve : déploiement `READY` sur le commit fusionné, la page d'accueil répond, puis relevé du PC (question à LIA, plus de 3 minutes d'attente, rechargement : la discussion est là).
