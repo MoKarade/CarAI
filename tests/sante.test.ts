@@ -7,6 +7,7 @@
 
 import { describe, it, expect } from "vitest";
 import { GET } from "../app/api/sante/route";
+import { commitServi } from "../lib/sante";
 
 async function withDatabaseUrl(value: string | undefined, fn: () => Promise<void>) {
   const before = process.env.DATABASE_URL;
@@ -40,6 +41,54 @@ describe("GET /api/sante", () => {
     await withDatabaseUrl(undefined, async () => {
       const res = await GET();
       expect(res.headers.get("cache-control")).toBe("no-store");
+    });
+  });
+});
+
+describe("le commit servi (VERCEL_GIT_COMMIT_SHA)", () => {
+  const SHA = "9a1635f4acaafe0cd58d4d82a90d2d893ca324e2";
+
+  async function avecSha(valeur: string | undefined, fn: () => Promise<void>) {
+    const avant = process.env.VERCEL_GIT_COMMIT_SHA;
+    if (valeur === undefined) delete process.env.VERCEL_GIT_COMMIT_SHA;
+    else process.env.VERCEL_GIT_COMMIT_SHA = valeur;
+    try {
+      await fn();
+    } finally {
+      if (avant === undefined) delete process.env.VERCEL_GIT_COMMIT_SHA;
+      else process.env.VERCEL_GIT_COMMIT_SHA = avant;
+    }
+  }
+
+  it("valide : un SHA hexadécimal donne ses 7 premiers caractères, en minuscules", () => {
+    expect(commitServi(SHA)).toBe("9a1635f");
+    expect(commitServi(SHA.toUpperCase())).toBe("9a1635f");
+    expect(commitServi("9a1635f")).toBe("9a1635f");
+  });
+
+  it("rejeté : absent, vide, trop court ou non hexadécimal → pas de champ, rien d'inventé", () => {
+    for (const mauvais of [undefined, "", "9a1635", "zzzzzzzzzz", "9a1635f; drop table", " 9a1635f"]) {
+      expect(commitServi(mauvais)).toBeUndefined();
+    }
+  });
+
+  it("la réponse porte le commit quand la variable est posée (cas ok:false)", async () => {
+    await withDatabaseUrl(undefined, () =>
+      avecSha(SHA, async () => {
+        const res = await GET();
+        expect(res.status).toBe(503);
+        expect(await res.json()).toEqual({ ok: false, cause: "base", commit: "9a1635f" });
+      }),
+    );
+  });
+
+  it("la réponse n'a pas le champ commit quand la variable est absente ou invalide", async () => {
+    await withDatabaseUrl(undefined, async () => {
+      for (const valeur of [undefined, "pas-un-sha"]) {
+        await avecSha(valeur, async () => {
+          expect(await (await GET()).json()).toEqual({ ok: false, cause: "base" });
+        });
+      }
     });
   });
 });
