@@ -8,11 +8,6 @@ import { describe, expect, it } from "vitest";
 
 const DOSSIER = ".github/workflows";
 
-// Fichier protégé : le garde-fou refuse qu'une PR le modifie seule (fusion réservée à Marc). Son repli vers le
-// robot du PC est inerte (dépôt public : la condition de visibilité choisit `ubuntu-latest`) ; il reste la seule
-// mention, tolérée à cette ligne exacte et nulle part ailleurs.
-const TOLERE = { fichier: "garde-fou.yml", ligne: /^runs-on: \$\{\{ github\.event\.repository\.visibility == 'public' && 'ubuntu-latest' \|\| fromJSON\('\["self-hosted","pc-marc"\]'\) \}\}/ };
-
 /** Les lignes actives (hors commentaires) qui nomment le robot du PC. */
 export function lignesRobotPc(yaml: string): string[] {
   return yaml
@@ -29,9 +24,7 @@ describe("le robot du PC ne sert plus le dépôt (CarAI#14)", () => {
   });
 
   it.each(fichiers)("%s ne vise ni self-hosted ni pc-marc", (fichier) => {
-    const lignes = lignesRobotPc(readFileSync(`${DOSSIER}/${fichier}`, "utf8"));
-    const restantes = fichier === TOLERE.fichier ? lignes.filter((l) => !TOLERE.ligne.test(l)) : lignes;
-    expect(restantes).toEqual([]);
+    expect(lignesRobotPc(readFileSync(`${DOSSIER}/${fichier}`, "utf8"))).toEqual([]);
   });
 
   it("refuse un workflow qui viserait le robot du PC", () => {
