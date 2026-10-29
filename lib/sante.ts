@@ -14,6 +14,18 @@ export const DUREE_CACHE_SANTE_MS = 45_000;
 type Sonde = () => Promise<boolean>;
 
 /**
+ * Le commit servi, en 7 caractères : de quoi voir, après un retour en arrière, quel
+ * déploiement le domaine sert vraiment (un alias Vercel peut rester figé sur un ancien).
+ * `VERCEL_GIT_COMMIT_SHA` est public (aucun secret, aucune donnée du véhicule). Une valeur
+ * absente ou qui n'est pas un SHA hexadécimal d'au moins 7 caractères rend `undefined` :
+ * jamais une valeur inventée.
+ */
+export function commitServi(sha: string | undefined): string | undefined {
+  if (!sha || !/^[0-9a-f]{7,40}$/i.test(sha)) return undefined;
+  return sha.slice(0, 7).toLowerCase();
+}
+
+/**
  * Enveloppe `sonde` : renvoie le dernier verdict tant qu'il a moins de `dureeMs`, sinon
  * relance UNE sonde (partagée entre appels simultanés). Une sonde qui lève vaut « pas ok ».
  */

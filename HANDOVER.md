@@ -4,6 +4,10 @@
 
 **Dernière mise à jour** : 2026-10-28 · branche `claude/robot-pc-14`
 
+## 29/10 — CarAI#248 : `/api/sante` dit le commit servi
+
+`GET /api/sante` porte aussi `"commit"` : les 7 premiers caractères de `VERCEL_GIT_COMMIT_SHA` (public, aucun secret, aucune donnée du véhicule), dans `ok:true` ET `ok:false`. Le champ est absent si la variable est absente ou n'est pas un SHA hexadécimal (`commitServi`, `lib/sante.ts` : jamais une valeur inventée). Le reste du corps ne change pas. But : voir, après un retour en arrière, quel déploiement le domaine sert (un alias Vercel peut rester figé sur un ancien), MoKarade/.github#822.
+
 ## 28/10 — CarAI#5 : le côté de la vue 3D est confirmé
 
 - Marc a regardé la vue 3D le 28/10/2026 (Tournée à l'écran, Hubperso#137 ligne 6) : les pressions tombent du bon côté. `COTE_VERIFIE` passe à `true` dans `lib/vehicle/ancresVoiture.ts`, la réserve « Gauche et droite ne sont pas encore confirmées » ne s'affiche plus, aucun signe à corriger. Le test de `tests/ancresVoiture.test.ts` attend maintenant `true`.

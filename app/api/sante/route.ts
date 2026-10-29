@@ -1,7 +1,7 @@
 // app/api/sante/route.ts — santé publique, pour la vigie de l'Atelier (#204).
 //
 // ⚠️ Route HORS du middleware d'authentification, SANS auth du tout — délibérément. Elle ne
-// rend jamais de donnée du véhicule ni un message d'erreur brut, seulement {"ok": true|false}.
+// rend jamais de donnée du véhicule ni un message d'erreur brut, seulement {"ok": true|false} et le commit servi (7 caractères).
 // Le piège que ça évite : derrière le garde de session, la vigie recevrait une redirection
 // HTML au lieu du JSON attendu et ne verrait JAMAIS une panne de base — exactement le défaut
 // de `/hub/summary` (voir l'en-tête de lib/authGuard.ts), revécu avec un autre appelant.
@@ -20,7 +20,7 @@
 import { sql } from "drizzle-orm";
 import { db, baseConfiguree } from "@/lib/db";
 import { assurerMigrations } from "@/lib/migrations";
-import { creerCacheSante } from "@/lib/sante";
+import { commitServi, creerCacheSante } from "@/lib/sante";
 
 export const dynamic = "force-dynamic";
 
@@ -47,10 +47,15 @@ async function sonderBase(): Promise<boolean> {
 const santeBase = creerCacheSante(sonderBase);
 
 export async function GET(): Promise<Response> {
+  // Le commit servi, dans les deux verdicts : c'est justement quand la sonde est rouge
+  // qu'on veut savoir quel déploiement répond. Champ absent hors Vercel.
+  const commit = commitServi(process.env.VERCEL_GIT_COMMIT_SHA);
+  const servi = commit ? { commit } : {};
+
   if (!baseConfiguree()) {
-    return Response.json({ ok: false, cause: "base" }, { status: 503, headers: NO_STORE });
+    return Response.json({ ok: false, cause: "base", ...servi }, { status: 503, headers: NO_STORE });
   }
 
-  if (await santeBase()) return Response.json({ ok: true }, { headers: NO_STORE });
-  return Response.json({ ok: false, cause: "base" }, { status: 503, headers: NO_STORE });
+  if (await santeBase()) return Response.json({ ok: true, ...servi }, { headers: NO_STORE });
+  return Response.json({ ok: false, cause: "base", ...servi }, { status: 503, headers: NO_STORE });
 }
