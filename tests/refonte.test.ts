@@ -166,6 +166,33 @@ describe("commandes : appui maintenu, ZÉRO rechargement (Marc, 18/08)", () => {
   });
 });
 
+describe("le bouton à maintenir n'est armé que par le bouton principal (CarAI#245)", () => {
+  // Vrai quand le gestionnaire `onPointerDown` sort sur un autre bouton que le principal
+  // AVANT de lancer `commencer()`. Une ligne active : un commentaire ne compte pas.
+  const garde = (source: string): boolean => {
+    const corps = source.match(/onPointerDown=\{\(e\) => \{([\s\S]*?)\n\s*\}\}/)?.[1] ?? "";
+    const actives = corps.split("\n").filter((l) => !l.trim().startsWith("//"));
+    const g = actives.findIndex((l) => /if \(e\.button !== 0\) return;/.test(l));
+    const c = actives.findIndex((l) => l.includes("commencer()"));
+    return g >= 0 && c >= 0 && g < c;
+  };
+
+  it("un pointerdown d'un autre bouton que le principal ne démarre pas le geste", () => {
+    // Un clic droit (menu de LIA) sur un bouton qui envoie une commande au véhicule ou
+    // supprime des mesures ne doit jamais armer le minuteur de 800 ms.
+    expect(garde(readFileSync("app/ui/BoutonMaintenir.tsx", "utf8"))).toBe(true);
+  });
+
+  it("rejette l'absence de garde, la garde commentée et la garde placée après le départ", () => {
+    const ouvrir = "onPointerDown={(e) => {\n        e.preventDefault();\n";
+    const fermer = "      }}";
+    expect(garde(`${ouvrir}        commencer();\n${fermer}`)).toBe(false);
+    expect(garde(`${ouvrir}        // if (e.button !== 0) return;\n        commencer();\n${fermer}`)).toBe(false);
+    expect(garde(`${ouvrir}        commencer();\n        if (e.button !== 0) return;\n${fermer}`)).toBe(false);
+    expect(garde(`${ouvrir}        if (e.button !== 0) return;\n        commencer();\n${fermer}`)).toBe(true);
+  });
+});
+
 describe("la zone parcourue de Tendances passe par Google (Marc, 18/08)", () => {
   it("Tendances tente Google, et REVIENT au tracé quand l'image échoue", () => {
     // « Dans zone parcourue dans l'onglet Tendances je vois juste le tracé, aucune carte. »
